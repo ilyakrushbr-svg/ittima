@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "nickname": { "type": "string", "description": "Display name" },
+        "photoURL": { "type": "string", "description": "Avatar URL" },
+        "lang": { "type": "string", "enum": ["be", "ru"], "description": "Preferred language" },
+        "totalPoints": { "type": "number", "description": "Total points earned" },
+        "scenariosCompleted": { "type": "number", "description": "Count of completed scenarios" },
+        "lastActive": { "type": "string", "format": "date-time", "description": "Last activity timestamp" }
+      },
+      "required": ["uid", "nickname", "lang", "totalPoints"]
+    },
+    "LeaderboardEntry": {
+      "title": "Leaderboard Entry",
+      "description": "Public leaderboard data",
+      "type": "object",
+      "properties": {
+        "nickname": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "totalPoints": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["nickname", "totalPoints"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Private user data"
+    },
+    "/leaderboard/{userId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Publicly visible leaderboard data"
+    }
+  }
+}
