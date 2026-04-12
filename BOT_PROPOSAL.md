@@ -12,7 +12,8 @@ The bot acts as the "Gateway" and "Notifier".
   - The user's leaderboard rank changes.
   - The user hasn't completed their daily challenge.
 - **Deep Linking**: Supports `startapp` parameters.
-  - Example: `t.me/scamlab_bot/app?startapp=scenario_601` launches the app directly into the Banking scenario.
+  - **Bot Logic**: When a user sends `/start scenario_ID`, the bot should respond with a message and a button to launch the Mini App with that ID.
+  - **Link Format**: `t.me/scamlab_bot/app?startapp=scenario_601` launches the app directly into the Banking scenario.
 - **Verification**: Checks if the user is subscribed to the channel to unlock exclusive "Expert" scenarios.
 
 ## 2. Telegram Channel (@scamlab_channel)

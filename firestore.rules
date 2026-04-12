@@ -11,6 +11,7 @@
 //   - lang: string (required, 'be'|'ru') - Language preference
 //   - totalPoints: number (required, >=0) - Total score
 //   - scenariosCompleted: number (optional) - Progress
+//   - completedScenarios: list (optional) - List of IDs
 //   - lastActive: timestamp (optional) - Last seen
 //
 // Collection: leaderboard
@@ -59,7 +60,9 @@ service cloud.firestore {
       return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 50 &&
              data.lang in ['be', 'ru'] &&
              data.totalPoints is number && data.totalPoints >= 0 &&
-             (!('photoURL' in data) || isValidUrl(data.photoURL));
+             (!('photoURL' in data) || isValidUrl(data.photoURL)) &&
+             (!('scenariosCompleted' in data) || data.scenariosCompleted is number) &&
+             (!('completedScenarios' in data) || data.completedScenarios is list);
     }
 
     function isValidLeaderboard(data) {

@@ -11,6 +11,7 @@
         "lang": { "type": "string", "enum": ["be", "ru"], "description": "Preferred language" },
         "totalPoints": { "type": "number", "description": "Total points earned" },
         "scenariosCompleted": { "type": "number", "description": "Count of completed scenarios" },
+        "completedScenarios": { "type": "array", "items": { "type": "number" }, "description": "List of completed scenario IDs" },
         "lastActive": { "type": "string", "format": "date-time", "description": "Last activity timestamp" }
       },
       "required": ["uid", "nickname", "lang", "totalPoints"]
