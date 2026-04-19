@@ -2,41 +2,42 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "User profile and settings",
+      "description": "Telegram user player profile and progress",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "Firebase Auth UID" },
-        "nickname": { "type": "string", "description": "Display name" },
-        "photoURL": { "type": "string", "description": "Avatar URL" },
-        "lang": { "type": "string", "enum": ["be", "ru"], "description": "Preferred language" },
-        "totalPoints": { "type": "number", "description": "Total points earned" },
-        "scenariosCompleted": { "type": "number", "description": "Count of completed scenarios" },
-        "completedScenarios": { "type": "array", "items": { "type": "number" }, "description": "List of completed scenario IDs" },
-        "lastActive": { "type": "string", "format": "date-time", "description": "Last activity timestamp" }
+        "id": { "type": "string", "description": "Telegram User ID" },
+        "username": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lang": { "type": "string", "enum": ["be", "ru"] },
+        "xp": { "type": "integer", "minimum": 0 },
+        "level": { "type": "integer", "minimum": 1 },
+        "completedScenarios": { "type": "array", "items": { "type": "integer" } },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "nickname", "lang", "totalPoints"]
+      "required": ["id", "xp", "level", "createdAt"]
     },
-    "LeaderboardEntry": {
-      "title": "Leaderboard Entry",
-      "description": "Public leaderboard data",
+    "Log": {
+      "title": "Log",
+      "description": "Action logs for audit and tracking",
       "type": "object",
       "properties": {
-        "nickname": { "type": "string" },
-        "photoURL": { "type": "string" },
-        "totalPoints": { "type": "number" },
-        "lastUpdated": { "type": "string", "format": "date-time" }
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["nickname", "totalPoints"]
+      "required": ["userId", "action", "timestamp"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
+    "users/{userId}": {
       "schema": "User",
-      "description": "Private user data"
+      "description": "User progress stored by Telegram ID as document ID"
     },
-    "/leaderboard/{userId}": {
-      "schema": "LeaderboardEntry",
-      "description": "Publicly visible leaderboard data"
+    "logs/{logId}": {
+      "schema": "Log",
+      "description": "Generic system and user activity logs"
     }
   }
 }

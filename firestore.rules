@@ -1,96 +1,39 @@
-// ===============================================================
-// Assumed Data Model
-// ===============================================================
-//
-// Collection: users
-// Document ID: {userId} (Firebase Auth UID)
-// Fields:
-//   - uid: string (required) - Auth UID
-//   - nickname: string (required, max 50) - Display name
-//   - photoURL: string (optional, URL) - Avatar
-//   - lang: string (required, 'be'|'ru') - Language preference
-//   - totalPoints: number (required, >=0) - Total score
-//   - scenariosCompleted: number (optional) - Progress
-//   - completedScenarios: list (optional) - List of IDs
-//   - lastActive: timestamp (optional) - Last seen
-//
-// Collection: leaderboard
-// Document ID: {userId} (Firebase Auth UID)
-// Fields:
-//   - nickname: string (required, max 50) - Public name
-//   - photoURL: string (optional, URL) - Public avatar
-//   - totalPoints: number (required, >=0) - Public score
-//   - lastUpdated: timestamp (required) - Update time
-//
-// ===============================================================
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-
-    function isAuthenticated() {
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidUser(data) {
-      return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 50 &&
-             data.lang in ['be', 'ru'] &&
-             data.totalPoints is number && data.totalPoints >= 0 &&
-             (!('photoURL' in data) || isValidUrl(data.photoURL)) &&
-             (!('scenariosCompleted' in data) || data.scenariosCompleted is number) &&
-             (!('completedScenarios' in data) || data.completedScenarios is list);
-    }
-
-    function isValidLeaderboard(data) {
-      return data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 50 &&
-             data.totalPoints is number && data.totalPoints >= 0 &&
-             (!('photoURL' in data) || isValidUrl(data.photoURL));
-    }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
+    // User progress
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      // Allow user to read their own profile (if we use Firebase Auth linking later)
+      // For now, we only allow admin/server-side access unless linked.
+      // But let's assume we might use client-side reading for progress.
+      // allow read: if isSignedIn() && request.auth.uid == userId;
+      
+      // Public leaderboard reading if needed
+      allow list: if true; // In a real production app, you might restrict this.
+      allow get: if true;
+      
+      // Deny all client-side writes to enforce server-side authority (Telegram Bot/API)
+      allow write: if false; 
     }
 
-    match /leaderboard/{userId} {
-      // Publicly readable for the global ranking
-      allow read: if isAuthenticated();
-      
-      // Only the owner can update their own entry
-      allow create: if isOwner(userId) && isValidLeaderboard(request.resource.data);
-      allow update: if isOwner(userId) && isValidLeaderboard(request.resource.data);
-      
-      // Prevent deletion (optional, but keeps leaderboard stable)
-      allow delete: if false;
+    // Logs
+    match /logs/{logId} {
+      // Logs are write-only from server, generally no client access needed.
+      allow read, write: if false;
     }
   }
 }

@@ -12,7 +12,7 @@
   --c-glass-border: rgba(255, 255, 255, 0.12);
   --c-glass-border-bright: rgba(255, 255, 255, 0.25);
   --c-label: #FFFFFF;
-  --c-label-muted: rgba(255, 255, 255, 0.5);
+  --c-label-muted: rgba(255, 255, 255, 0.7);
   --c-blue: #007AFF;
   --c-blue-glow: rgba(0, 122, 255, 0.4);
   --c-green: #30D158;
@@ -21,6 +21,16 @@
   --radius-xl: 32px;
   --radius-lg: 24px;
   --radius-md: 16px;
+
+  /* Liquid Glass Variables */
+  --tint-color: 255, 255, 255;
+  --tint-opacity: 0.06;
+  --shadow-blur: 20px;
+  --shadow-spread: -5px;
+  --shadow-color: rgba(255, 255, 255, 0.45);
+  --outer-shadow-blur: 24px;
+  --glass-radius: 32px;
+  --accent: #007AFF;
 }
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -55,25 +65,181 @@ html, body, #root {
 @keyframes floatA { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(10%, 5%) scale(1.1); } }
 @keyframes floatB { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-5%, -10%) scale(0.9); } }
 
+@keyframes glass-flow {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
 /* --- Liquid Glass Utility --- */
 @utility glass {
-  background: var(--c-glass);
-  backdrop-filter: blur(25px) saturate(180%);
-  -webkit-backdrop-filter: blur(25px) saturate(180%);
-  border: 1px solid var(--c-glass-border);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 20px 40px -10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  isolation: isolate;
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: -100%;
+  z-index: -1;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+  animation: glass-flow 20s linear infinite;
+  pointer-events: none;
+}
+
+.glass::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 30px 60px -15px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.glass:hover::after {
+  transform: scale(1.05) translate(5%, 2%);
+  opacity: 0.7;
 }
 
 @utility glass-bright {
   background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--c-glass-border-bright);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(50px) saturate(220%);
+  -webkit-backdrop-filter: blur(50px) saturate(220%);
+}
+
+.suspended-panel {
+  @apply glass rounded-[44px] p-8 mb-8 mx-2;
+  box-shadow: 
+    0 40px 80px -20px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* --- Premium Liquid Buttons --- */
+@utility btn-liquid {
+  @apply relative flex items-center justify-center gap-2 py-4 px-6 rounded-[22px] font-bold transition-all duration-500;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  box-shadow: 
+    0 10px 20px -5px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.btn-liquid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(255,255,255,0.05) 100%);
+  opacity: 0.5;
+  z-index: -1;
+  transition: opacity 0.4s ease;
+}
+
+.btn-liquid::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.12) 0%, transparent 60%);
+  transform: translate(-10%, -10%);
+  pointer-events: none;
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 0;
+}
+
+.btn-liquid:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-3px) scale(1.02);
+  backdrop-filter: blur(40px) saturate(200%);
+  box-shadow: 
+    0 20px 40px -12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 20px rgba(255, 255, 255, 0.05);
+}
+
+.btn-liquid:hover::after {
+  transform: translate(15%, 15%);
+}
+
+.btn-liquid:active {
+  transform: translateY(0) scale(0.96);
+  background: rgba(255, 255, 255, 0.15);
+  transition-duration: 0.1s;
+  box-shadow: 
+    0 5px 15px -4px rgba(0, 0, 0, 0.4),
+    inset 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+@utility btn-liquid-primary {
+  @apply btn-liquid;
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.15) 0%, rgba(0, 81, 255, 0.1) 100%);
+  border-color: rgba(0, 122, 255, 0.3);
+  box-shadow: 
+    0 10px 25px -5px rgba(0, 122, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-liquid-primary:hover {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.25) 0%, rgba(0, 81, 255, 0.2) 100%);
+  border-color: rgba(0, 122, 255, 0.5);
+  box-shadow: 
+    0 15px 35px -8px rgba(0, 122, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn-liquid-primary:active {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.35) 0%, rgba(0, 81, 255, 0.3) 100%);
+  box-shadow: 0 0 30px rgba(0, 122, 255, 0.5);
+}
+
+.btn-liquid:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.btn-secondary {
+  @apply btn-liquid;
 }
 
 /* --- Buttons --- */
 .btn-primary {
-  @apply relative overflow-hidden transition-all active:scale-95;
-  background: linear-gradient(135deg, #007AFF 0%, #0051FF 100%);
-  box-shadow: 0 10px 25px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  @apply btn-liquid-primary;
 }
 .btn-primary::after {
   content: ''; @apply absolute inset-0 opacity-0 transition-opacity;
@@ -83,24 +249,31 @@ html, body, #root {
 
 /* --- Components --- */
 .sphere-card {
-  @apply glass flex flex-col items-center justify-center p-4 rounded-[24px] transition-all active:scale-90;
+  @apply btn-liquid flex flex-col items-center justify-center p-4 rounded-[28px] transition-all active:scale-90;
 }
 .sphere-card.selected {
-  @apply border-blue-500 bg-blue-500/20 shadow-[0_0_25px_rgba(0,122,255,0.3)];
+  @apply border-blue-500/50 bg-blue-500/20 shadow-[0_0_30px_rgba(0,122,255,0.3)];
 }
 
 .option-btn {
-  @apply glass w-full p-5 rounded-[20px] text-left font-medium transition-all active:scale-[0.97] mb-3;
+  @apply btn-liquid w-full p-5 rounded-[24px] text-left font-medium transition-all active:scale-[0.97] mb-3;
+  @apply flex items-center justify-start gap-4;
 }
-.option-btn.correct { @apply bg-green-500/20 border-green-500/50 text-green-400; }
-.option-btn.wrong { @apply bg-red-500/20 border-red-500/50 text-red-400; }
+.option-btn.correct { @apply bg-green-500/20 border-green-500/50 text-green-400 shadow-[0_0_20px_rgba(48,209,88,0.2)]; }
+.option-btn.wrong { @apply bg-red-500/20 border-red-500/50 text-red-400 shadow-[0_0_20px_rgba(255,69,58,0.2)]; }
 
 /* --- Navigation --- */
 .tab-bar {
-  @apply fixed bottom-0 left-0 right-0 h-[84px] glass flex items-center justify-around px-6 pb-[env(safe-area-inset-bottom)] z-[100] rounded-t-[32px] border-t border-white/10;
+  @apply fixed bottom-0 left-0 right-0 h-[84px] flex items-center justify-around px-6 pb-[env(safe-area-inset-bottom)] z-[100] rounded-t-[36px] border-t border-white/10;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  box-shadow: 
+    0 -10px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 .tab-item {
-  @apply flex flex-col items-center gap-1 text-white/40 transition-colors;
+  @apply flex flex-col items-center gap-1 text-white/60 transition-colors;
 }
 .tab-item.active { @apply text-blue-500; }
 
