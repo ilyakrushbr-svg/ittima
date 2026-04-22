@@ -15,12 +15,13 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
+  admin.initializeApp();
 }
 // Correct way to get a named database instance in Newer Firebase Admin SDK
-const firestore = getFirestore(firebaseConfig.firestoreDatabaseId);
+// Using databaseId from config if provided, otherwise default
+const firestore = firebaseConfig.firestoreDatabaseId 
+  ? getFirestore(firebaseConfig.firestoreDatabaseId)
+  : getFirestore();
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 const adminId = process.env.ADMIN_TELEGRAM_ID;
@@ -83,24 +84,33 @@ const langKB = {
 
 // Helper: Ensure user exists in Firestore
 async function ensureUser(id: number, username: string, firstName: string) {
-  const userRef = firestore.collection('users').doc(id.toString());
-  const doc = await userRef.get();
-  
-  if (!doc.exists) {
-    const newUser = {
-      id: id.toString(),
-      username: username || '',
-      firstName: firstName || '',
-      lang: 'ru',
-      xp: 0,
-      level: 1,
-      lastActive: admin.firestore.FieldValue.serverTimestamp(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-    await userRef.set(newUser);
-    return newUser;
+  try {
+    const userRef = firestore.collection('users').doc(id.toString());
+    const doc = await userRef.get();
+    
+    if (!doc.exists) {
+      const newUser = {
+        id: id.toString(),
+        username: username || '',
+        firstName: firstName || '',
+        lang: 'ru',
+        xp: 0,
+        level: 1,
+        lastActive: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await userRef.set(newUser);
+      return newUser;
+    }
+    return doc.data();
+  } catch (err: any) {
+    console.error(`❌ ensureUser error for ID ${id}:`, {
+      message: err.message,
+      code: err.code
+    });
+    // Return a dummy user or throw to let the caller handle it
+    return { id: id.toString(), username, firstName, lang: 'ru', xp: 0, level: 1 };
   }
-  return doc.data();
 }
 
 bot.start(async (ctx) => {
@@ -213,8 +223,26 @@ async function startServer() {
     bot.handleUpdate(req.body, res);
   });
 
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', mode: 'firestore' });
+  app.get('/api/health', async (req, res) => {
+    try {
+      // Test Firestore connectivity
+      const testColl = firestore.collection('_health_check');
+      await testColl.limit(1).get();
+      res.json({ status: 'ok', mode: 'firestore', connectivity: 'success' });
+    } catch (err: any) {
+      console.error('🔥 Firestore Health Check Failed:', {
+        message: err.message,
+        code: err.code,
+        projectId: firebaseConfig.projectId,
+        databaseId: firebaseConfig.firestoreDatabaseId
+      });
+      res.status(500).json({ 
+        status: 'error', 
+        error: err.message, 
+        code: err.code,
+        details: 'Check server logs for full JSON' 
+      });
+    }
   });
 
   // API to get all player results (for Mini App)
@@ -287,9 +315,14 @@ async function startServer() {
       }
       
       res.json({ success: true });
-    } catch (err) {
-      console.error('Sync error:', err);
-      res.status(500).json({ error: 'Database error' });
+    } catch (err: any) {
+      console.error('Sync error details:', {
+        message: err.message,
+        code: err.code,
+        projectId: firebaseConfig.projectId,
+        databaseId: firebaseConfig.firestoreDatabaseId
+      });
+      res.status(500).json({ error: 'Database error', details: err.message });
     }
   });
 

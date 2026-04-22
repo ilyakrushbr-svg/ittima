@@ -104,8 +104,8 @@ export default function App() {
   const [showAlertModal, setShowAlertModal] = useState<{ show: boolean; title: string; message: string } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
-  const [screen, setScreen] = useState<'loading' | 'welcome' | 'intro' | 'game' | 'final' | 'hub' | 'leaderboard' | 'settings' | 'onboarding' | 'admin'>('loading');
-  const [activeTab, setActiveTab] = useState<'home' | 'leaderboard' | 'settings' | 'profile'>('home');
+  const [screen, setScreen] = useState<'loading' | 'welcome' | 'intro' | 'game' | 'final' | 'hub' | 'leaderboard' | 'news' | 'onboarding' | 'admin'>('loading');
+  const [activeTab, setActiveTab] = useState<'home' | 'news' | 'leaderboard' | 'profile'>('home');
 
   const isAdmin = auth.currentUser?.email === 'ilya.krush.br@gmail.com';
 
@@ -224,6 +224,9 @@ export default function App() {
         return;
       }
 
+      // Automatically set telegramId if we are in TG
+      setTelegramId(tgUser.id.toString());
+
       try {
         const res = await fetch(`/api/user/${tgUser.id}`);
         if (res.ok) {
@@ -252,7 +255,7 @@ export default function App() {
     };
 
     fetchUserData();
-  }, [tg]);
+  }, [tg, syncUserWithBackend]);
 
   // Sync Telegram data if it changes
   useEffect(() => {
@@ -363,7 +366,7 @@ export default function App() {
 
   const shareApp = () => {
     if (tg) {
-      const shareUrl = `https://t.me/share/url?url=https://t.me/scamlab_bot/app&text=${encodeURIComponent(t('Правер свае веды ў кібербяспецы ў SCAMLAB! 🛡️', 'Проверь свои знания в кибербезопасности в SCAMLAB! 🛡️'))}`;
+      const shareUrl = `https://t.me/share/url?url=https://t.me/scamlabbot/app&text=${encodeURIComponent(t('Правер свае веды ў кібербяспецы ў SCAMLAB! 🛡️', 'Проверь свои знания в кибербезопасности в SCAMLAB! 🛡️'))}`;
       tg.openTelegramLink(shareUrl);
     }
   };
@@ -387,11 +390,11 @@ export default function App() {
     
     playSfx('click');
     
-    const randomSphere = SPHERES[Math.floor(Math.random() * SPHERES.length)].id;
-    const pool = allScenarios.filter(s => s.sphere === randomSphere);
-    const scenario = pool[Math.floor(Math.random() * pool.length)];
+    // Pick 10 random scenarios for daily challenge
+    const shuffled = [...allScenarios].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
 
-    setGameQuestions([scenario]);
+    setGameQuestions(selected);
     setCurrentQIdx(0);
     setScore(0);
     setCorrectCount(0);
@@ -720,7 +723,7 @@ export default function App() {
         setScreen('intro');
       } else if (screen === 'final') {
         setScreen('intro');
-      } else if (screen === 'leaderboard' || screen === 'settings' || screen === 'hub') {
+      } else if (screen === 'leaderboard' || screen === 'news' || screen === 'hub' || screen === 'admin') {
         setScreen('intro');
         setActiveTab('home');
       } else if (screen === 'intro') {
@@ -870,7 +873,7 @@ export default function App() {
                 });
               }
             }}
-            className="btn-secondary w-full py-5 rounded-[24px]"
+            className="btn-primary w-full py-5 rounded-[24px]"
           >
             🇷🇺 Русский
           </button>
@@ -1114,7 +1117,7 @@ export default function App() {
     return (
       <div className="screen flex flex-col">
         <div className="nav-bar glass-nav">
-          <button onClick={() => setScreen('settings')} className="w-10 flex items-center justify-center">
+          <button onClick={() => setScreen('hub')} className="w-10 flex items-center justify-center">
             <ChevronLeft className="w-6 h-6" />
           </button>
           <span className="text-lg font-bold">ADMIN PANEL</span>
@@ -1470,149 +1473,76 @@ export default function App() {
     );
   };
 
-  const SettingsScreen = () => {
+  const NewsScreen = () => {
     return (
       <motion.div 
-        key="settings"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
+        key="news"
+        initial={{ opacity: 0, x: 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -30 }}
+        transition={SPRING}
         className="screen"
       >
         <div className="nav-bar glass-nav">
           <div className="w-10"></div>
-          <span className="text-lg font-bold tracking-tight">{t('Налады', 'Настройки')}</span>
+          <span className="text-lg font-bold tracking-tight">{t('Навіны', 'Новости')}</span>
           <div className="w-10"></div>
         </div>
 
         <div className="screen-scroll pb-24">
           <div className="suspended-panel mt-4">
             <div className="space-y-4">
-              <div className="glass p-5 rounded-[28px] border border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">{t('Профіль', 'Профиль')}</h3>
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-bold text-white/50 uppercase ml-1">{t('Ваш нікнейм', 'Ваш никнейм')}</label>
-                    <div className="glass-bright p-4 rounded-2xl flex items-center gap-3 opacity-80">
-                      <User className="w-5 h-5 text-blue-500" />
-                      <div className="text-sm font-semibold text-white">
-                        {nickname}
-                      </div>
-                    </div>
+              {news.length === 0 ? (
+                <div className="glass p-8 rounded-[32px] text-center">
+                  <div className="w-16 h-16 rounded-full bg-white/5 mx-auto mb-4 flex items-center justify-center">
+                    <Info className="w-8 h-8 text-white/20" />
                   </div>
+                  <p className="text-sm font-bold text-white/40">{t('Навін пакуль няма', 'Новостей пока нет')}</p>
                 </div>
-              </div>
-
-              <div className="glass p-5 rounded-[28px] border border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">{t('Агульныя', 'Общие')}</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
-                        <Languages className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-bold">{t('Мова', 'Язык')}</span>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setShowLangModal(true);
-                        playSfx('click');
-                      }}
-                      className="text-xs font-black text-blue-400 uppercase tracking-widest"
-                    >
-                      {lang === 'be' ? 'Беларуская' : 'Русский'}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
-                        {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-                      </div>
-                      <span className="text-sm font-bold">{t('Гук', 'Звук')}</span>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setSoundEnabled(!soundEnabled);
-                        playSfx('click');
-                      }}
-                      className={`w-12 h-6 rounded-full transition-all relative ${soundEnabled ? 'bg-blue-500' : 'bg-white/10'}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${soundEnabled ? 'right-1' : 'left-1'}`}></div>
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
-                        {musicEnabled ? <Music className="w-5 h-5" /> : <Music2 className="w-5 h-5" />}
-                      </div>
-                      <span className="text-sm font-bold">{t('Музыка', 'Музыка')}</span>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setMusicEnabled(!musicEnabled);
-                        playSfx('click');
-                      }}
-                      className={`w-12 h-6 rounded-full transition-all relative ${musicEnabled ? 'bg-blue-500' : 'bg-white/10'}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${musicEnabled ? 'right-1' : 'left-1'}`}></div>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass p-5 rounded-[28px] border border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">{t('Супольнасць', 'Сообщество')}</h3>
-                <div className="space-y-4">
-                  <button 
-                    onClick={shareApp}
-                    className="btn-primary w-full py-4 rounded-2xl flex items-center justify-center gap-2"
+              ) : (
+                news.map(item => (
+                  <motion.div 
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass overflow-hidden rounded-[32px] border border-white/5"
                   >
-                    <Users className="w-5 h-5" />
-                    <span>{t('Запрасіць сяброў', 'Пригласить друзей')}</span>
-                  </button>
-                  <button 
-                    onClick={() => tg?.openTelegramLink('https://t.me/scamlab_channel')}
-                    className="btn-secondary w-full"
-                  >
-                    <Smartphone className="w-5 h-5" />
-                    <span>{t('Падпісацца на канал', 'Подписаться на канал')}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="glass p-5 rounded-[28px] border border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">{t('Дапамога', 'Помощь')}</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40">
-                      <Info className="w-5 h-5" />
+                    {item.imageUrl && (
+                      <img 
+                        src={item.imageUrl} 
+                        alt="" 
+                        className="w-full h-40 object-cover" 
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-lg font-black leading-tight flex-1 mr-2">{t(item.title_be, item.title_ru)}</h3>
+                        <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest whitespace-nowrap mt-1">
+                          {new Date(item.createdAt?.seconds * 1000 || Date.now()).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/60 leading-relaxed mb-4 line-clamp-3">
+                        {t(item.content_be, item.content_ru)}
+                      </p>
+                      {item.telegraphUrl && (
+                        <button 
+                          onClick={() => tg?.openTelegramLink(item.telegraphUrl)}
+                          className="w-full py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                        >
+                          <span>{t('Чытаць цалкам', 'Читать полностью')}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
-                    <span className="text-sm font-bold">{t('Аб дадатку', 'О приложении')}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40">
-                      <Shield className="w-5 h-5" />
-                    </div>
-                    <span className="text-sm font-bold">{t('Канфідэнцыяльнасць', 'Конфиденциальность')}</span>
-                  </div>
-                </div>
-              </div>
-
-              {isAdmin && (
-                <div className="glass p-5 rounded-[28px] border border-blue-500/20 bg-blue-500/5">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-4">{t('Адміністраванне', 'Администрирование')}</h3>
-                  <button 
-                    onClick={() => {
-                      setScreen('admin');
-                      playSfx('click');
-                    }}
-                    className="btn-primary w-full py-4 rounded-2xl flex items-center justify-center gap-2"
-                  >
-                    <Settings className="w-5 h-5" />
-                    <span>{t('Адмін панэль', 'Админ панель')}</span>
-                  </button>
-                </div>
+                  </motion.div>
+                ))
               )}
+              <div className="p-4 text-center">
+                <p className="text-[10px] font-medium text-white/20">
+                  {t('Навіны публікуюцца праз афіцыйны канал', 'Новости публикуются через официальный канал')}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -1719,6 +1649,18 @@ export default function App() {
         </button>
         <button 
           onClick={() => {
+            setScreen('news');
+            setActiveTab('news');
+            playSfx('click');
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+          }}
+          className={`tab-item ${activeTab === 'news' ? 'active' : ''}`}
+        >
+          <Smartphone className="w-5 h-5" />
+          <span className="text-[9px] font-medium">{t('Навіны', 'Новости')}</span>
+        </button>
+        <button 
+          onClick={() => {
             setScreen('leaderboard');
             setActiveTab('leaderboard');
             playSfx('click');
@@ -1728,18 +1670,6 @@ export default function App() {
         >
           <Trophy className="w-5 h-5" />
           <span className="text-[9px] font-medium">{t('Лідары', 'Лидеры')}</span>
-        </button>
-        <button 
-          onClick={() => {
-            setScreen('settings');
-            setActiveTab('settings');
-            playSfx('click');
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-          }}
-          className={`tab-item ${activeTab === 'settings' ? 'active' : ''}`}
-        >
-          <Settings className="w-5 h-5" />
-          <span className="text-[9px] font-medium">{t('Налады', 'Настройки')}</span>
         </button>
         <button 
           onClick={() => {
@@ -1773,7 +1703,7 @@ export default function App() {
         {screen === 'onboarding' && <OnboardingScreen />}
 
         {screen === 'leaderboard' && <LeaderboardScreen />}
-        {screen === 'settings' && <SettingsScreen />}
+        {screen === 'news' && <NewsScreen />}
 
         {screen === 'admin' && <AdminPanel />}
 
@@ -1861,24 +1791,7 @@ export default function App() {
 
             <div className="screen-scroll pb-24">
               <div className="suspended-panel mt-4">
-                <div className="flex p-1 glass rounded-2xl mb-6">
-                  <button 
-                    onClick={() => setIntroView('training')}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${introView === 'training' ? 'bg-blue-500 text-white shadow-lg' : 'text-white/40'}`}
-                  >
-                    {t('Навучанне', 'Обучение')}
-                  </button>
-                  <button 
-                    onClick={() => setIntroView('news')}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${introView === 'news' ? 'bg-blue-500 text-white shadow-lg' : 'text-white/40'}`}
-                  >
-                    {t('Навіны', 'Новости')}
-                  </button>
-                </div>
-
-                {introView === 'training' ? (
-                  <>
-                    <div className="flex justify-between items-center mb-6 px-1">
+                <div className="flex justify-between items-center mb-6 px-1">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-white/5 overflow-hidden">
                       {photoURL ? (
@@ -2003,66 +1916,10 @@ export default function App() {
                     <ChevronRight className="w-6 h-6" />
                   </button>
                 </div>
-              </>
-            ) : (
-              <div className="space-y-4">
-                {news.length === 0 ? (
-                  <div className="glass p-8 rounded-[32px] text-center">
-                    <div className="w-16 h-16 rounded-full bg-white/5 mx-auto mb-4 flex items-center justify-center">
-                      <Info className="w-8 h-8 text-white/20" />
-                    </div>
-                    <p className="text-sm font-bold text-white/40">{t('Навін пакуль няма', 'Новостей пока нет')}</p>
-                  </div>
-                ) : (
-                  news.map(item => (
-                    <motion.div 
-                      key={item.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="glass overflow-hidden rounded-[32px] border border-white/5"
-                    >
-                      {item.imageUrl && (
-                        <img 
-                          src={item.imageUrl} 
-                          alt="" 
-                          className="w-full h-40 object-cover" 
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div className="p-6">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="text-lg font-black leading-tight flex-1 mr-2">{t(item.title_be, item.title_ru)}</h3>
-                          <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest whitespace-nowrap mt-1">
-                            {new Date(item.createdAt?.seconds * 1000 || Date.now()).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-xs text-white/60 leading-relaxed mb-4 line-clamp-3">
-                          {t(item.content_be, item.content_ru)}
-                        </p>
-                        {item.telegraphUrl && (
-                          <button 
-                            onClick={() => tg?.openTelegramLink(item.telegraphUrl)}
-                            className="w-full py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
-                          >
-                            <span>{t('Чытаць цалкам', 'Читать полностью')}</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-                <div className="p-4 text-center">
-                  <p className="text-[10px] font-medium text-white/20">
-                    {t('Навіны публікуюцца праз афіцыйны канал', 'Новости публикуются через официальный канал')}
-                  </p>
-                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-    )}
+            </div>
+          </motion.div>
+        )}
 
         {screen === 'game' && gameQuestions.length > 0 && (
           <motion.div 
@@ -2302,6 +2159,15 @@ export default function App() {
                       return t(rank?.name_be || '', rank?.name_ru || '');
                     })()}
                   </p>
+                  
+                  {isAdmin && (
+                    <button 
+                      onClick={() => setScreen('admin')}
+                      className="absolute top-4 right-4 w-10 h-10 glass rounded-full flex items-center justify-center text-blue-400 active:scale-90 transition-all shadow-lg"
+                    >
+                      <Settings className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
@@ -2315,7 +2181,7 @@ export default function App() {
                     <span className="text-[10px] font-bold uppercase tracking-widest">{t('Запрасіць', 'Пригласить')}</span>
                   </button>
                   <button 
-                    onClick={() => tg?.openTelegramLink('https://t.me/scamlab_channel')}
+                    onClick={() => tg?.openTelegramLink('https://t.me/scamlab_by')}
                     className="glass p-5 rounded-[28px] flex flex-col items-center gap-2 active:scale-95 transition-transform"
                   >
                     <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
@@ -2323,6 +2189,46 @@ export default function App() {
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-widest">{t('Канал', 'Канал')}</span>
                   </button>
+                </div>
+
+                <div className="glass p-5 rounded-[28px] border border-white/5 mb-6">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">{t('Налады', 'Настройки')}</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                          <Languages className="w-5 h-5" />
+                        </div>
+                        <span className="text-sm font-bold">{t('Мова', 'Язык')}</span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setShowLangModal(true);
+                          playSfx('click');
+                        }}
+                        className="text-xs font-black text-blue-400 uppercase tracking-widest"
+                      >
+                        {lang === 'be' ? 'Беларуская' : 'Русский'}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
+                          {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                        </div>
+                        <span className="text-sm font-bold">{t('Гук', 'Звук')}</span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSoundEnabled(!soundEnabled);
+                          playSfx('click');
+                        }}
+                        className={`w-12 h-6 rounded-full transition-all relative ${soundEnabled ? 'bg-blue-500' : 'bg-white/10'}`}
+                      >
+                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${soundEnabled ? 'right-1' : 'left-1'}`}></div>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
@@ -2342,64 +2248,27 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="glass p-6 rounded-[32px] mb-6 border border-blue-500/20 bg-blue-500/5">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-2xl">
-                      🤖
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-black text-lg leading-tight">{t('Telegram Бот', 'Telegram Бот')}</div>
-                      <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                        {telegramId ? t('Падключана', 'Подключено') : t('Атрымлівайце апавяшчэнні', 'Получайте уведомления')}
-                      </div>
-                    </div>
-                    {telegramId && <CheckCircle2 className="w-6 h-6 text-green-500" />}
-                  </div>
-
-                  {!telegramId && (
-                    <div className="space-y-4">
-                      <p className="text-xs text-white/60 leading-relaxed">
-                        {t('Падключыце бота, каб атрымліваць апавяшчэнні аб прагрэсе і новых навінах.', 'Подключите бота, чтобы получать уведомления о прогрессе и новых новостях.')}
-                      </p>
-                      {linkCode ? (
-                        <div className="flex flex-col gap-3">
-                          <div className="glass p-4 rounded-2xl text-center">
-                            <span className="text-[10px] text-white/30 uppercase block mb-1">{t('Ваш код', 'Ваш код')}</span>
-                            <span className="text-2xl font-black tracking-[0.2em] text-blue-400">{linkCode}</span>
-                          </div>
-                          <button 
-                            onClick={() => tg?.openTelegramLink(`https://t.me/scamlab_admin_bot?start=${linkCode}`)}
-                            className="btn-primary w-full py-3 rounded-xl text-sm font-bold"
-                          >
-                            {t('Адкрыць бота', 'Открыть бота')}
-                          </button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={generateLinkCode}
-                          className="btn-secondary w-full py-3 rounded-xl text-sm font-bold"
-                        >
-                          {t('Згенераваць код', 'Сгенерировать код')}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
                 <div className="glass p-6 rounded-[32px] mb-6">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-4">{t('Дасягненні', 'Достижения')}</h3>
-                  <div className="grid grid-cols-4 gap-4">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-6">{t('Дасягненні', 'Достижения')}</h3>
+                  <div className="space-y-4">
                     {[
-                      { id: 'first_win', icon: '🎯', unlocked: completedScenarios.length > 0 },
-                      { id: 'streak_3', icon: '🔥', unlocked: streak >= 3 },
-                      { id: 'xp_1000', icon: '💎', unlocked: xp >= 1000 },
-                      { id: 'expert', icon: '🛡️', unlocked: Math.floor(xp / 100) + 1 >= 10 }
+                      { id: 'first_win', icon: '🎯', title_be: 'Першаадкрывальнік', title_ru: 'Первооткрыватель', desc_be: 'Пройдзена першая сімуляцыя', desc_ru: 'Пройдена первая симуляция', unlocked: completedScenarios.length > 0 },
+                      { id: 'streak_3', icon: '🔥', title_be: 'Настойлівы', title_ru: 'Настойчивый', desc_be: 'Серыя з 3 дзён', desc_ru: 'Серия из 3 дней', unlocked: streak >= 3 },
+                      { id: 'xp_1000', icon: '💎', title_be: 'Эксперт', title_ru: 'Эксперт', desc_be: 'Набрана 1000 XP', desc_ru: 'Набрано 1000 XP', unlocked: xp >= 1000 },
+                      { id: 'master', icon: '🛡️', title_be: 'Майстар бяспекі', title_ru: 'Мастер безопасности', desc_be: 'Дасягнуты 10 узровень', desc_ru: 'Достигнут 10 уровень', unlocked: Math.floor(xp / 100) + 1 >= 10 }
                     ].map(ach => (
-                      <div key={ach.id} className={`flex flex-col items-center gap-2 transition-all ${ach.unlocked ? 'opacity-100 scale-110' : 'opacity-20 grayscale'}`}>
-                        <div className={`w-12 h-12 rounded-2xl glass flex items-center justify-center text-2xl ${ach.unlocked ? 'border-blue-500/50 bg-blue-500/10' : ''}`}>
+                      <div 
+                        key={ach.id} 
+                        className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${ach.unlocked ? 'bg-white/5 border border-white/5' : 'opacity-40 grayscale blur-[0.5px]'}`}
+                      >
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl ${ach.unlocked ? 'glass-bright text-blue-400' : 'glass text-white/10'}`}>
                           {ach.icon}
                         </div>
-                        <span className="text-[8px] font-bold uppercase">{ach.unlocked ? t('Адкрыта', 'Открыто') : t('Замкнёна', 'Закрыто')}</span>
+                        <div className="flex-1">
+                          <div className="text-sm font-black mb-0.5">{t(ach.title_be, ach.title_ru)}</div>
+                          <div className="text-[10px] font-medium text-white/40">{t(ach.desc_be, ach.desc_ru)}</div>
+                        </div>
+                        {ach.unlocked && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                       </div>
                     ))}
                   </div>
