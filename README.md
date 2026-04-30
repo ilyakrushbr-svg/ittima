@@ -1,72 +1,81 @@
-# Scamlab — Платформа для навучання лічбавай бяспецы
+# Scamlab — Digital Security Education Platform
 
-**Scamlab** — гэта інтэрактыўны вэб-дадатак (Telegram Mini App), распрацаваны для навучання карыстальнікаў распазнаванню розных відаў інтэрнэт-махлярства праз гейміфікаваны вопыт.
+Scamlab is a comprehensive Telegram Mini App (TMA) ecosystem designed to educate users on cybersecurity and fraud prevention through gamified interactive simulations.
 
-## 🚀 Асноўныя функцыі
+## 🌟 Overview
 
-- **Інтэрактыўныя сімуляцыі**: Карыстальнікі праходзяць розныя сцэнарыі (фішынг, СМС-махлярства, сацыяльная інжынерыя) і прымаюць рашэнні ў рэальным часе.
-- **Гейміфікацыя**:
-  - **Сістэма XP і ўзроўняў**: Набірайце ачкі вопыту за правільныя адказы.
-  - **Серыя (Streak)**: Сачыце за колькасцю памылак запар (ці іх адсутнасцю).
-  - **Рэйтынг**: Спаборнічайце з іншымі карыстальнікамі ў табліцы лідараў.
-  - **Дасягненні**: Разблакуйце спецыяльныя значкі за поспехі.
-- **Шматмоўнасць**: Поўная падтрымка беларускай і рускай моў.
-- **Telegram Bot**: Кіраванне профілем, прагляд статыстыкі і доступ да гульні непасрэдна праз Telegram.
-- **Адаптыўны дызайн**: Поўная аптымізацыя пад мабільныя прылады праз Telegram Mini Apps API.
-
-## 🛠 Тэхнічны стэк
-
-- **Frontend**: React 18, TypeScript, Vite.
-- **Стылізацыя**: Tailwind CSS, Framer Motion (для анімацый), Lucide React (іконы).
-- **Backend**: Node.js (Express) — гібрыдны сервер, які абслугоўвае API і Telegram-бота.
-- **Telegram SDK**: `telegraf` (для бота), `@telegram-apps/sdk` (для Mini App).
-- **База дадзеных**: SQLite (лакальна) / Firestore (праз Firebase).
-- **Гук**: Howler.js.
-
-## 🏗 Архітэктура
-
-### 1. Frontend (React SPA)
-Знаходзіцца ў тэчцы `src/`.
-- `App.tsx`: Асноўная логіка экранаў, кіраванне станам гульні і інтэрфейс.
-- `data/scenarios.ts`: Усе навучальныя відэа і тэставыя пытанні.
-- `services/`: Логіка ўзаемадзеяння з backend і Firebase.
-
-### 2. Backend (server.ts)
-Адзіны серверны файл, які выконвае дзве ролі:
-- **API Server**: Апрацоўвае запыты ад Mini App (статыстыка, лідары).
-- **Telegram Bot**: Апрацоўвае каманды (`/start`, `/leaders`) і забяспечвае рух у інтэрфейсе бота праз Inline-кнопкі.
-
-### 3. Бот (Telegram Bot)
-Бот выкарыстоўвае **Inline Keyboard** для навігацыі:
-- Кнопкі не адпраўляюць новыя паведамленні, а абнаўляюць бягучае (editMessage), што робіць інтэрфейс чыстым.
-- Падтрымлівае WebApp кнопку для хуткага запуску гульні.
-
-## 📦 Усталёўка і запуск
-
-1. **Клонаванне і ўсталёўка залежнасцяў**:
-   ```bash
-   npm install
-   ```
-
-2. **Налада асяроддзя (.env)**:
-   Стварыце файл `.env.example` (ці `.env`) і запоўніце:
-   - `TELEGRAM_BOT_TOKEN`: Токен вашага бота ад @BotFather.
-   - `APP_URL`: Публічны URL вашага дадатка.
-   - `ADMIN_TELEGRAM_ID`: Ваш ID для атрымання апавяшчэнняў.
-
-3. **Запуск у рэжыме распрацоўкі**:
-   ```bash
-   npm run dev
-   ```
-
-4. **Зборка для продакшн**:
-   ```bash
-   npm run build
-   ```
-
-## 🔒 Бяспека
-
-Прыкладанне выкарыстоўвае Firebase для бяспечнага захавання дадзеных карыстальнікаў. Статыстыка сінхранізуецца паміж вэб-інтэрфейсам і Telegram-ботам у рэальным часе.
+Scamlab replaces traditional dry security briefings with a high-fidelity, interactive "lab" where users face real-world scam scenarios (phishing, social engineering, SMS fraud) in a safe environment. The platform features a hybrid architecture connecting a React-based frontend with a Node.js backend and a Telegram Bot.
 
 ---
-*Распрацавана з дапамогай Google AI Studio.*
+
+## 🛠 Technical Architecture
+
+### 1. Frontend: React Mini App
+The core user experience is a Single Page Application (SPA) optimized for the Telegram environment.
+
+*   **Framework**: React 18 with Vite.
+*   **Styling**: Tailwind CSS with custom "glassmorphic" design patterns.
+*   **Animations**: Framer Motion for high-density UI transitions and route effects.
+*   **State Management**: Complex local state synchronized with Firebase/Backend for persistence.
+*   **Localization**: A dual-language system (Belarusian & Russian) using a reactive `t()` helper.
+*   **Audio Engine**: Howler.js for immersive sound effects and haptic feedback integration.
+
+### 2. Backend: Hybrid Node.js Server
+A unified server (`server.ts`) that manages both the REST API and the Telegram Bot logic.
+
+*   **API Layer**: Express.js handling user synchronization, analytics, and leaderboard data.
+*   **Bot Framework**: Telegraf.js managing an asynchronous event loop for Telegram interactions.
+*   **Dual-Database Support**: 
+    *   **SQLite**: Handled via `better-sqlite3` for local development or lightweight deployments.
+    *   **Firebase/Firestore**: Cloud-native persistence for production scale.
+*   **Webhook Interface**: Secure endpoint for Telegram update delivery.
+
+---
+
+## ⚙️ Core Systems
+
+### 🎮 The Game Engine
+The simulation engine manages the educational flow:
+*   **Scenario Logic**: A non-linear progression system where users make choices under a countdown timer.
+*   **Scoring Algorithm**: Points are awarded based on accuracy and speed. A "Correctness Threshold" (currently 80%) determines if an answer qualifies as a success.
+*   **Combo & Streak System**: 
+    *   **Combo**: Rewards consecutive correct answers within a single session.
+    *   **Streak**: An "anti-fragile" metric that currently tracks *consecutive failures* (as per specific user request) to highlight user vulnerability patterns.
+
+### 🤖 Telegram Bot System
+The bot acts as the entry point and administrative dashboard:
+*   **Inline Navigation**: Unlike traditional bots that spam messages, Scamlab uses "stateless" UI updates. Every menu interaction triggers an `editMessageText` call, providing a seamless, app-like experience within the chat.
+*   **Web App Integration**: Launches the Mini App with authenticated user data via the `web_app` button type.
+*   **Commands**:
+    *   `/start`: Deep-linking and user onboarding.
+    *   `/leaders`: Fetches the top 10 global players.
+    *   `/status`: Real-time system health check (DB mode, user count).
+
+### 📊 Progress & Sync System
+Bridges the gap between the Mini App and the Chat Bot:
+*   **Real-time Sync**: XP, Levels, and Streaks updated in the Mini App are immediately visible in the Bot's profile view.
+*   **Leveling Curve**: A square-root-based progression formula (`level = floor(sqrt(xp/10)) + 1`) ensures a satisfying but challenging advancement.
+*   **Rank Hierarchy**: Users progress through tiers from "Novice" to "Security Master" based on their level.
+
+### 🛡️ Security & Content System
+*   **Firebase Rules**: Hardened Firestore rules preventing unauthorized data modification.
+*   **Content Schema**: Scenarios are defined in a modular JSON-like structure, allowing for rapid deployment of new "threat vectors" without code changes.
+
+---
+
+## 🚀 Deployment & Configuration
+
+### Environment Variables
+Required secrets in `.env.example`:
+*   `TELEGRAM_BOT_TOKEN`: API token from @BotFather.
+*   `APP_URL`: The public endpoint for webhooks and WebApp links.
+*   `ADMIN_TELEGRAM_ID`: ID of the system administrator for support routing.
+*   `USE_WEBHOOK`: Toggle between long-polling and webhook mode.
+
+### Scripts
+*   `npm run dev`: Starts the hybrid server with Vite middleware.
+*   `npm run build`: Compiles the frontend for production delivery.
+*   `npm run start`: Launches the production server.
+
+---
+*Developed by Google AI Studio Build.*
