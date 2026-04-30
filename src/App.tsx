@@ -35,7 +35,12 @@ import {
   Music,
   Music2,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Video,
+  MoreVertical,
+  Smile,
+  Paperclip,
+  Mic
 } from 'lucide-react';
 import scenariosData from './data/scenarios';
 import { Scenario, Option } from './types';
@@ -124,7 +129,9 @@ export default function App() {
   const [xp, setXp] = useState(() => parseInt(localStorage.getItem('scamlab_xp') || '0'));
   const [level, setLevel] = useState(() => parseInt(localStorage.getItem('scamlab_level') || '1'));
   const [streak, setStreak] = useState(() => parseInt(localStorage.getItem('scamlab_streak') || '0'));
-  const [lastActivityDate, setLastActivityDate] = useState(() => localStorage.getItem('scamlab_last_activity') || '');
+  const [maxComboOverall, setMaxComboOverall] = useState(() => parseInt(localStorage.getItem('scamlab_max_combo') || '0'));
+  const [totalCorrect, setTotalCorrect] = useState(() => parseInt(localStorage.getItem('scamlab_total_correct') || '0'));
+  const [totalAnswered, setTotalAnswered] = useState(() => parseInt(localStorage.getItem('scamlab_total_answered') || '0'));
   const [completedScenarios, setCompletedScenarios] = useState<number[]>(() => {
     const saved = localStorage.getItem('scamlab_completed');
     return saved ? JSON.parse(saved) : [];
@@ -193,7 +200,11 @@ export default function App() {
           firstName: tg?.initDataUnsafe?.user?.first_name,
           xp: data.xp ?? xp,
           level: data.level ?? level,
-          lang: data.lang ?? lang
+          lang: data.lang ?? lang,
+          streak: data.streak ?? streak,
+          maxCombo: data.maxCombo ?? maxComboOverall,
+          totalAnswered: data.totalAnswered ?? totalAnswered,
+          totalCorrect: data.totalCorrect ?? totalCorrect
         })
       });
     } catch (error) {
@@ -212,7 +223,9 @@ export default function App() {
   useEffect(() => { localStorage.setItem('scamlab_xp', String(xp)); }, [xp]);
   useEffect(() => { localStorage.setItem('scamlab_level', String(level)); }, [level]);
   useEffect(() => { localStorage.setItem('scamlab_streak', String(streak)); }, [streak]);
-  useEffect(() => { localStorage.setItem('scamlab_last_activity', lastActivityDate); }, [lastActivityDate]);
+  useEffect(() => { localStorage.setItem('scamlab_max_combo', String(maxComboOverall)); }, [maxComboOverall]);
+  useEffect(() => { localStorage.setItem('scamlab_total_correct', String(totalCorrect)); }, [totalCorrect]);
+  useEffect(() => { localStorage.setItem('scamlab_total_answered', String(totalAnswered)); }, [totalAnswered]);
   useEffect(() => { localStorage.setItem('scamlab_completed', JSON.stringify(completedScenarios)); }, [completedScenarios]);
 
   // Persistence logic and Initial Data Load
@@ -235,6 +248,10 @@ export default function App() {
           if (data.nickname) setNickname(data.nickname);
           if (data.xp) setXp(data.xp);
           if (data.level) setLevel(data.level);
+          if (data.streak) setStreak(data.streak);
+          if (data.maxCombo) setMaxComboOverall(data.maxCombo);
+          if (data.totalCorrect) setTotalCorrect(data.totalCorrect);
+          if (data.totalAnswered) setTotalAnswered(data.totalAnswered);
           // Potential completed scenarios sync
         } else {
           // New user or not found, sync initial info
@@ -269,48 +286,6 @@ export default function App() {
       }
     }
   }, [tg]);
-
-  // Streak logic
-  const updateStreak = useCallback(() => {
-    const today = new Date().toDateString();
-    if (lastActivityDate === today) return;
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toDateString();
-
-    if (lastActivityDate === yesterdayStr) {
-      setStreak(prev => prev + 1);
-    } else {
-      setStreak(1);
-    }
-    setLastActivityDate(today);
-    
-    if (auth.currentUser) {
-      syncUserWithBackend(auth.currentUser.uid, {
-        streak: lastActivityDate === yesterdayStr ? streak + 1 : 1,
-        lastActivityDate: today
-      });
-    }
-  }, [lastActivityDate, streak]);
-
-  // Check for streak reset on load
-  useEffect(() => {
-    const today = new Date().toDateString();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toDateString();
-
-    if (lastActivityDate && lastActivityDate !== today && lastActivityDate !== yesterdayStr) {
-      setStreak(0);
-    }
-  }, [lastActivityDate]);
-
-  useEffect(() => {
-    if (screen === 'final') {
-      updateStreak();
-    }
-  }, [screen, updateStreak]);
 
   // Trigger sync on important changes
   const sendNotification = async (message: string) => {
@@ -375,8 +350,98 @@ export default function App() {
     // Analytics/Session tracking logic could go here
   }, []);
 
-  // Data fetching handled by separate useEffects
-  
+  // --- Components ---
+
+  const StatsOverview = ({ variant = 'default' }: { variant?: 'default' | 'profile' }) => {
+    const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+    const currentRank = RANKS.filter(r => level >= r.min).pop();
+    
+    if (variant === 'profile') {
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass p-5 rounded-[28px]">
+              <div className="flex items-center gap-2 mb-2">
+                <Trophy className="w-4 h-4 text-yellow-500" />
+                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('Рэйтынг', 'Рейтинг')}</span>
+              </div>
+              <div className="text-2xl font-black">#{userRank || '---'}</div>
+            </div>
+            <div className="glass p-5 rounded-[28px]">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-orange-500" />
+                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('Вопыт', 'Опыт')}</span>
+              </div>
+              <div className="text-2xl font-black">{xp} XP</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-5 rounded-[28px] bg-white/5 border border-white/5">
+              <div className="text-[10px] font-bold text-white/30 uppercase mb-1">{t('Серыя', 'Серия')}</div>
+              <div className="text-xl font-black text-yellow-400">{streak} 🔥</div>
+            </div>
+            <div className="p-5 rounded-[28px] bg-white/5 border border-white/5">
+              <div className="text-[10px] font-bold text-white/30 uppercase mb-1">{t('Лепшая комба', 'Лучшее комбо')}</div>
+              <div className="text-xl font-black text-orange-500">{maxComboOverall} 🎯</div>
+            </div>
+          </div>
+          
+          <div className="space-y-5">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold">{t('Пройдзена тэстаў', 'Пройдено тестов')}</span>
+                <span className="text-xs font-black">{completedScenarios.length} / {allScenarios.length}</span>
+              </div>
+              <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, (completedScenarios.length / Math.max(1, allScenarios.length)) * 100)}%` }}
+                  className="h-full bg-blue-500" 
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold">{t('Дакладнасць', 'Точность')}</span>
+                <span className="text-xs font-black">{accuracy}%</span>
+              </div>
+              <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${accuracy}%` }}
+                  className="h-full bg-green-500" 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        <div className="glass p-4 rounded-[24px] text-center">
+          <div className="text-2xl font-black text-yellow-400">{xp}</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">XP</div>
+        </div>
+        <div className="glass p-4 rounded-[24px] text-center border-blue-500/30 bg-blue-500/5">
+          <div className="text-2xl font-black text-blue-500">{level}</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">{t('узровень', 'уровень')}</div>
+        </div>
+        <div className="glass p-4 rounded-[24px] text-center border-yellow-500/20 bg-yellow-500/5 relative overflow-hidden">
+          <div className="absolute top-1 right-1 opacity-20"><Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" /></div>
+          <div className="text-2xl font-black text-yellow-400">{streak}</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">{t('серыя', 'серия')}</div>
+        </div>
+        <div className="glass p-4 rounded-[24px] text-center border-green-500/20 bg-green-500/5">
+          <div className="text-2xl font-black text-green-500">{accuracy}%</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">{t('дакладнасць', 'точность')}</div>
+        </div>
+      </div>
+    );
+  };
   const [dailyCompleted, setDailyCompleted] = useState(() => {
     const lastDaily = localStorage.getItem('lastDailyDate');
     return lastDaily === new Date().toDateString();
@@ -392,7 +457,10 @@ export default function App() {
     
     // Pick 10 random scenarios for daily challenge
     const shuffled = [...allScenarios].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
+    const selected = shuffled.slice(0, Math.min(10, shuffled.length)).map(q => ({
+      ...q,
+      options: [...q.options].sort(() => 0.5 - Math.random())
+    }));
 
     setGameQuestions(selected);
     setCurrentQIdx(0);
@@ -560,7 +628,10 @@ export default function App() {
     }
 
     const shuffled = pool.sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, Math.min(N_QUESTIONS, pool.length));
+    const selected = shuffled.slice(0, Math.min(N_QUESTIONS, pool.length)).map(q => ({
+      ...q,
+      options: [...q.options].sort(() => 0.5 - Math.random())
+    }));
 
     setGameQuestions(selected);
     setCurrentQIdx(0);
@@ -594,7 +665,11 @@ export default function App() {
               const scenario = allScenarios.find(s => s.id === scenarioId);
               
               if (scenario) {
-                setGameQuestions([scenario]);
+                const preparedScenario = {
+                  ...scenario,
+                  options: [...scenario.options].sort(() => 0.5 - Math.random())
+                };
+                setGameQuestions([preparedScenario]);
                 setCurrentQIdx(0);
                 setScore(0);
                 setCorrectCount(0);
@@ -621,6 +696,29 @@ export default function App() {
     return () => clearInterval(interval);
   }, [tg, startTimer]);
 
+  const haptic = useCallback((type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'light') => {
+    if (!tg?.HapticFeedback) {
+      // Fallback for non-telegram environments
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        switch(type) {
+          case 'light': navigator.vibrate(10); break;
+          case 'medium': navigator.vibrate(20); break;
+          case 'heavy': navigator.vibrate(40); break;
+          case 'success': navigator.vibrate([10, 30, 10]); break;
+          case 'warning': navigator.vibrate([15, 50, 15]); break;
+          case 'error': navigator.vibrate([20, 100, 20]); break;
+        }
+      }
+      return;
+    }
+    
+    if (type === 'success' || type === 'warning' || type === 'error') {
+      tg.HapticFeedback.notificationOccurred(type);
+    } else {
+      tg.HapticFeedback.impactOccurred(type);
+    }
+  }, [tg]);
+
   const startAiGame = async () => {
     startGame();
   };
@@ -633,38 +731,57 @@ export default function App() {
 
     const q = gameQuestions[currentQIdx];
     const opt = q.options[idx];
-    const maxPts = Math.max(...q.options.map(o => o.points));
-    const isCorrect = opt.points === maxPts;
+    const maxPts = Math.max(...q.options.map(o => o.points)) || 1;
+    // An answer is considered correct if it has at least 80% of the maximum possible points
+    const isCorrect = opt.points >= maxPts * 0.8;
 
-    const timeBonus = timer > 10 ? 2 : timer > 5 ? 1 : 0;
-    const pts = opt.points + (isCorrect ? timeBonus : 0);
+    const timeBonus = (isCorrect && timer > 10) ? 2 : (isCorrect && timer > 5) ? 1 : 0;
+    const pts = opt.points + timeBonus;
     
     setScore(prev => prev + pts);
     const newXp = xp + pts * 2;
     setXp(newXp); 
 
+    // Update Streak: increment on incorrect, reset on correct
+    if (!isCorrect) {
+      setStreak(prev => prev + 1);
+    } else {
+      setStreak(0);
+    }
+
     // Level calculation logic
     const newLevel = Math.floor(Math.sqrt(newXp / 10)) + 1;
     if (newLevel > level) {
       setLevel(newLevel);
+      haptic('success');
     }
 
     if (isCorrect) {
       playSfx('success');
-      setCombo(prev => prev + 1);
+      const newCombo = combo + 1;
+      setCombo(newCombo);
+      if (newCombo > maxCombo) setMaxCombo(newCombo);
+      if (newCombo > maxComboOverall) setMaxComboOverall(newCombo);
       setCorrectCount(prev => prev + 1);
-      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      setTotalCorrect(prev => prev + 1);
+      
+      if (newCombo % 5 === 0) {
+        haptic('heavy');
+      } else {
+        haptic('success');
+      }
     } else {
       playSfx('error');
       setCombo(0);
       setWrongCount(prev => prev + 1);
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
-      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      haptic('error');
     }
 
+    setTotalAnswered(prev => prev + 1);
     setShowFeedback(true);
-  }, [answered, gameQuestions, currentQIdx, timer, tg]);
+  }, [answered, gameQuestions, currentQIdx, timer, tg, xp, level, combo, maxCombo, maxComboOverall, haptic, playSfx]);
 
   const nextQuestion = useCallback(() => {
     if (currentQIdx + 1 < gameQuestions.length) {
@@ -678,8 +795,10 @@ export default function App() {
       if (score >= 80) {
         playSfx('success');
         sendNotification(t(`🏆 Выдатны вынік! Вы набралі ${score} балаў.`, `🏆 Отличный результат! Вы набрали ${score} баллов.`));
+        haptic('success');
       } else if (score < 30) {
         playSfx('error');
+        haptic('error');
       }
       
       // Mark scenarios as completed
@@ -840,6 +959,7 @@ export default function App() {
                 setScreen('onboarding');
               }
               playSfx('click');
+              haptic('medium');
               // Sync if already logged in
               if (auth.currentUser && isAuthReady) {
                 syncUserWithBackend(auth.currentUser.uid, {
@@ -863,6 +983,7 @@ export default function App() {
                 setScreen('onboarding');
               }
               playSfx('click');
+              haptic('medium');
               // Sync if already logged in
               if (auth.currentUser && isAuthReady) {
                 syncUserWithBackend(auth.currentUser.uid, {
@@ -988,22 +1109,70 @@ export default function App() {
 
   const WhatsappUI = ({ content }: { content: any }) => {
     if (!content) return null;
+    const messages = content.messages || (content.message ? [content.message] : []);
+    
     return (
-      <div className="ui-whatsapp bg-[#075e54] rounded-2xl overflow-hidden">
-        <div className="bg-[#075e54] p-3 flex items-center gap-3 border-b border-white/5">
-          <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-lg">👤</div>
-          <div className="flex-1">
-            <div className="text-sm font-bold text-white">{t(content.sender)}</div>
-            <div className="text-[10px] text-white/60">{t('у сетцы', 'в сети')}</div>
+      <div className="ui-whatsapp rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col w-full bg-[#efe7de] transition-all duration-500">
+        {/* Sub-Header / Chat Header */}
+        <div className="bg-[#008069] p-3 pl-4 flex items-center gap-3 shrink-0 shadow-md z-10">
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg overflow-hidden border border-white/10 shadow-inner">
+            {content.avatar ? <img src={content.avatar} alt="" className="w-full h-full object-cover" /> : '👤'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-white truncate leading-tight">{t(content.sender || content.from || 'WhatsApp')}</div>
+            <div className="text-[11px] text-white/80 flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#46d362] animate-pulse"></span>
+              {t('у сетцы', 'в сети')}
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-white pr-2">
+            <Video className="w-5 h-5 opacity-90 hover:opacity-100 cursor-pointer transition-opacity" />
+            <Phone className="w-4 h-4 opacity-90 hover:opacity-100 cursor-pointer transition-opacity" />
+            <MoreVertical className="w-5 h-5 opacity-90 hover:opacity-100 cursor-pointer transition-opacity" />
           </div>
         </div>
-        <div className="p-4 flex flex-col gap-2 bg-[#e5ddd5]">
-          {content.messages?.map((msg: any, i: number) => (
-            <div key={i} className="p-3 rounded-lg text-sm max-w-[85%] self-start bg-white text-black shadow-sm relative">
-              {t(typeof msg === 'string' ? msg : msg.text)}
-              <div className="text-[9px] text-black/40 text-right mt-1">14:20</div>
+
+        {/* Chat Area */}
+        <div className="flex-1 wa-chat-bg p-4 flex flex-col gap-2 min-h-[300px] max-h-[450px] overflow-y-auto scrollbar-hide">
+          {messages.length > 0 ? messages.map((msg: any, i: number) => {
+            const isOut = msg.from === 'me';
+            const text = t(msg.text || msg);
+            return (
+              <div 
+                key={i} 
+                className={`flex ${isOut ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                style={{ animationDelay: `${i * 150}ms` }}
+              >
+                <div className={`wa-bubble ${isOut ? 'wa-bubble-out' : 'wa-bubble-in'} relative max-w-[85%] px-3 py-1.5 shadow-sm`}>
+                  <div className="text-[14.5px] leading-[1.4] text-[#111b21] break-words">
+                    {text}
+                  </div>
+                  <div className="flex items-center justify-end gap-1 mt-0.5 h-3">
+                    <span className="text-[10px] text-[#667781]">14:20</span>
+                    {isOut && <CheckCircle2 className="w-3 h-3 text-[#53bdeb]" />}
+                  </div>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="text-center text-gray-500 text-xs italic mt-10">
+              {t('Няма паведамленняў', 'Нет сообщений')}
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* Fake Input Area */}
+        <div className="bg-[#f0f2f5] p-2 flex items-center gap-2 shrink-0 border-t border-[#e9edef]">
+          <div className="flex gap-3 px-2 text-[#54656f]">
+             <Smile className="w-6 h-6" />
+             <Paperclip className="w-6 h-6" />
+          </div>
+          <div className="flex-1 bg-white rounded-xl px-4 py-2.5 flex items-center justify-between text-[#8696a0] shadow-sm border border-transparent focus-within:border-[#008069] transition-colors">
+            <span className="text-[15px]">{t('Паведамленне', 'Сообщение')}</span>
+          </div>
+          <div className="w-11 h-11 rounded-full bg-[#00a884] flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform">
+            <Mic className="w-6 h-6" />
+          </div>
         </div>
       </div>
     );
@@ -1569,10 +1738,12 @@ export default function App() {
       if (step < steps.length - 1) {
         setStep(step + 1);
         playSfx('click');
+        haptic('light');
       } else {
         setScreen('intro');
         setShowOnboarding(false);
         playSfx('transition');
+        haptic('medium');
       }
     };
 
@@ -1640,7 +1811,7 @@ export default function App() {
             setScreen('intro');
             setActiveTab('home');
             playSfx('click');
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            haptic('light');
           }}
           className={`tab-item ${activeTab === 'home' ? 'active' : ''}`}
         >
@@ -1652,7 +1823,7 @@ export default function App() {
             setScreen('news');
             setActiveTab('news');
             playSfx('click');
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            haptic('light');
           }}
           className={`tab-item ${activeTab === 'news' ? 'active' : ''}`}
         >
@@ -1664,7 +1835,7 @@ export default function App() {
             setScreen('leaderboard');
             setActiveTab('leaderboard');
             playSfx('click');
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            haptic('light');
           }}
           className={`tab-item ${activeTab === 'leaderboard' ? 'active' : ''}`}
         >
@@ -1676,7 +1847,7 @@ export default function App() {
             setScreen('hub');
             setActiveTab('profile');
             playSfx('click');
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            haptic('light');
           }}
           className={`tab-item ${activeTab === 'profile' ? 'active' : ''}`}
         >
@@ -1804,7 +1975,6 @@ export default function App() {
                       <span className="text-xs font-bold text-white/80">{nickname}</span>
                       <span className="text-[10px] font-medium text-white/40 uppercase tracking-widest">
                         {(() => {
-                          const level = Math.floor(xp / 100) + 1;
                           const rank = RANKS.filter(r => level >= r.min).pop();
                           return t(rank?.name_be || '', rank?.name_ru || '');
                         })()}
@@ -1813,28 +1983,11 @@ export default function App() {
                   </div>
                   <div className="flex items-center gap-2 glass px-3 py-1.5 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
                     <Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                    <span className="text-[10px] font-black text-yellow-400">{streak} {t('ДЗЕНЬ', 'ДЕНЬ')}</span>
+                    <span className="text-[10px] font-black text-yellow-400">{streak}</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-8">
-                  <div className="glass p-4 rounded-[24px] text-center">
-                    <div className="text-2xl font-black text-yellow-400">{xp}</div>
-                    <div className="text-[9px] font-bold text-white/50 uppercase">XP</div>
-                  </div>
-                  <div className="glass p-4 rounded-[24px] text-center border-blue-500/30 bg-blue-500/5">
-                    <div className="text-2xl font-black text-blue-500">{Math.floor(xp / 100) + 1}</div>
-                    <div className="text-[9px] font-bold text-white/50 uppercase">{t('узровень', 'уровень')}</div>
-                  </div>
-                  <div className="glass p-4 rounded-[24px] text-center border-yellow-500/20 bg-yellow-500/5">
-                    <div className="text-2xl font-black text-yellow-400">{streak}</div>
-                    <div className="text-[9px] font-bold text-white/50 uppercase">{t('серыя', 'серия')}</div>
-                  </div>
-                  <div className="glass p-4 rounded-[24px] text-center border-green-500/20 bg-green-500/5">
-                    <div className="text-2xl font-black text-green-500">{completedScenarios.length}/{allScenarios.length}</div>
-                    <div className="text-[9px] font-bold text-white/50 uppercase">{t('прагрэс', 'прогресс')}</div>
-                  </div>
-                </div>
+                <StatsOverview />
 
                 <div className="mb-8">
                   <div className="flex justify-between items-center mb-4 px-1">
@@ -1845,6 +1998,7 @@ export default function App() {
                     onClick={() => {
                       startDailyChallenge();
                       playSfx('click');
+                      haptic('medium');
                     }}
                     disabled={dailyCompleted}
                     className={`w-full p-6 rounded-[32px] flex items-center justify-between transition-all ${dailyCompleted ? 'bg-green-500/10 border border-green-500/20 opacity-50' : 'btn-primary shadow-xl shadow-blue-500/20'}`}
@@ -1874,7 +2028,7 @@ export default function App() {
                         onClick={() => {
                           setSelectedSphere(selectedSphere === s.id ? null : s.id);
                           playSfx('click');
-                          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                          haptic('light');
                         }}
                         className={`sphere-card h-24 ${selectedSphere === s.id ? 'selected' : ''}`}
                       >
@@ -1894,7 +2048,7 @@ export default function App() {
                         onClick={() => {
                           setSelectedDiff(d);
                           playSfx('click');
-                          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                          haptic('light');
                         }}
                         className={`py-4 rounded-[20px] border-1.5 transition-all text-sm font-bold ${selectedDiff === d ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/20' : 'glass border-white/5 text-white/60'}`}
                       >
@@ -1909,6 +2063,7 @@ export default function App() {
                     onClick={() => {
                       startGame();
                       playSfx('click');
+                      haptic('medium');
                     }}
                     className="btn-primary w-full py-5 rounded-[28px] text-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
                   >
@@ -1978,7 +2133,8 @@ export default function App() {
 
                 <div className="space-y-3">
                   {gameQuestions[currentQIdx].options.map((opt, i) => {
-                    const isCorrect = opt.points === Math.max(...gameQuestions[currentQIdx].options.map(o => o.points));
+                    const maxPts = Math.max(...gameQuestions[currentQIdx].options.map(o => o.points)) || 1;
+                    const isCorrect = opt.points >= maxPts * 0.8;
                     const isSelected = selectedOptionIdx === i;
                     
                     return (
@@ -2003,9 +2159,11 @@ export default function App() {
                               isCorrect ? <Check className="w-4 h-4" /> : (isSelected ? <X className="w-4 h-4" /> : String.fromCharCode(65 + i))
                             ) : String.fromCharCode(65 + i)}
                           </div>
-                          <span className={`flex-1 font-semibold text-sm leading-snug ${answered && isCorrect ? 'text-green-400' : (answered && isSelected ? 'text-red-400' : '')}`}>
-                            {t(opt.text)}
-                          </span>
+                          <div className="flex-1">
+                            <span className={`block font-semibold text-sm leading-snug ${answered && isCorrect ? 'text-green-400' : (answered && isSelected ? 'text-red-400' : '')}`}>
+                              {t(opt.text)}
+                            </span>
+                          </div>
                         </div>
                       </motion.button>
                     );
@@ -2023,32 +2181,52 @@ export default function App() {
                   transition={SPRING}
                   className="fixed bottom-0 left-0 right-0 p-6 z-50 backdrop-blur-md bg-black/40"
                 >
-                  <div className={`bg-[#121212] p-6 rounded-[32px] shadow-2xl border-t-2 ${selectedOptionIdx !== null && gameQuestions[currentQIdx].options[selectedOptionIdx].points === Math.max(...gameQuestions[currentQIdx].options.map(o => o.points)) ? 'border-green-500/50' : 'border-red-500/50'}`}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedOptionIdx !== null && gameQuestions[currentQIdx].options[selectedOptionIdx].points === Math.max(...gameQuestions[currentQIdx].options.map(o => o.points)) ? 'bg-green-500' : 'bg-red-500'}`}>
-                        {selectedOptionIdx !== null && gameQuestions[currentQIdx].options[selectedOptionIdx].points === Math.max(...gameQuestions[currentQIdx].options.map(o => o.points)) ? <Check className="w-6 h-6 text-white" /> : <X className="w-6 h-6 text-white" />}
+                  {(() => {
+                    const q = gameQuestions[currentQIdx];
+                    const selectedOpt = selectedOptionIdx !== null ? q.options[selectedOptionIdx] : null;
+                    const maxPts = Math.max(...q.options.map(o => o.points)) || 1;
+                    const isCorrect = selectedOpt ? selectedOpt.points >= maxPts * 0.8 : false;
+
+                    return (
+                      <div className={`bg-[#121212] p-6 rounded-[32px] shadow-2xl border-t-2 ${isCorrect ? 'border-green-500/50' : 'border-red-500/50'}`}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}>
+                            {isCorrect ? <Check className="w-6 h-6 text-white" /> : <X className="w-6 h-6 text-white" />}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-black uppercase tracking-widest ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
+                              {isCorrect ? t('Верна!', 'Верно!') : t('Памылка!', 'Ошибка!')}
+                            </span>
+                            {combo > 1 && isCorrect && <span className="text-[10px] font-bold text-orange-400 uppercase">{t('Комба', 'Комбо')} x{combo}!</span>}
+                          </div>
+                        </div>
+                        
+                        {selectedOptionIdx !== null && q.options[selectedOptionIdx].feedback && (
+                          <p className="text-sm text-white/80 leading-relaxed mb-6 font-medium">
+                            {t(q.options[selectedOptionIdx].feedback)}
+                          </p>
+                        )}
+                        
+                        {selectedOptionIdx === null && (
+                          <p className="text-sm text-white/80 leading-relaxed mb-6 font-medium">
+                            {t('Час выйшаў! Вы не паспелі абраць адказ.', 'Время вышло! Вы не успели выбрать ответ.')}
+                          </p>
+                        )}
+
+                        <button 
+                          onClick={() => {
+                            nextQuestion();
+                            playSfx('click');
+                            haptic('light');
+                          }}
+                          className="btn-primary w-full py-4 rounded-[20px] font-bold flex items-center justify-center gap-2"
+                        >
+                          <span>{t('Далей', 'Далее')}</span>
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
                       </div>
-                      <div className="flex flex-col">
-                        <span className={`text-sm font-black uppercase tracking-widest ${selectedOptionIdx !== null && gameQuestions[currentQIdx].options[selectedOptionIdx].points === Math.max(...gameQuestions[currentQIdx].options.map(o => o.points)) ? 'text-green-500' : 'text-red-500'}`}>
-                          {selectedOptionIdx !== null && gameQuestions[currentQIdx].options[selectedOptionIdx].points === Math.max(...gameQuestions[currentQIdx].options.map(o => o.points)) ? t('Верна!', 'Верно!') : t('Памылка!', 'Ошибка!')}
-                        </span>
-                        {combo > 1 && selectedOptionIdx !== null && gameQuestions[currentQIdx].options[selectedOptionIdx].points === Math.max(...gameQuestions[currentQIdx].options.map(o => o.points)) && <span className="text-[10px] font-bold text-orange-400 uppercase">{t('Комба', 'Комбо')} x{combo}!</span>}
-                      </div>
-                    </div>
-                    <p className="text-sm font-medium leading-relaxed text-white/80 mb-6">
-                      {selectedOptionIdx !== null ? t(gameQuestions[currentQIdx].options[selectedOptionIdx].feedback) : t('Час вышаў!', 'Время вышло!')}
-                    </p>
-                    <button 
-                      onClick={() => {
-                        nextQuestion();
-                        playSfx('click');
-                      }}
-                      className="btn-primary w-full py-4 rounded-[20px] font-bold flex items-center justify-center gap-2"
-                    >
-                      <span>{t('Далей', 'Далее')}</span>
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </div>
+                    );
+                  })()}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -2104,6 +2282,7 @@ export default function App() {
                   onClick={() => {
                     setScreen('intro');
                     playSfx('click');
+                    haptic('medium');
                   }} 
                   className="btn-primary w-full py-5 rounded-[28px] text-lg font-bold"
                 >
@@ -2114,6 +2293,7 @@ export default function App() {
                     setScreen('hub');
                     setActiveTab('profile');
                     playSfx('click');
+                    haptic('light');
                   }} 
                   className="w-full py-4 glass rounded-[24px] text-sm font-bold text-white/60"
                 >
@@ -2149,12 +2329,11 @@ export default function App() {
                     ) : (
                       <User className="w-12 h-12 text-blue-500" />
                     )}
-                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-blue-500 border-4 border-black flex items-center justify-center text-[10px] font-black">{Math.floor(xp / 100) + 1}</div>
+                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-blue-500 border-4 border-black flex items-center justify-center text-[10px] font-black">{level}</div>
                   </div>
                   <h2 className="text-2xl font-black mb-1">{nickname || t('Гулец', 'Игрок')}</h2>
                   <p className="text-xs font-bold text-white/30 uppercase tracking-widest">
                     {(() => {
-                      const level = Math.floor(xp / 100) + 1;
                       const rank = RANKS.filter(r => level >= r.min).pop();
                       return t(rank?.name_be || '', rank?.name_ru || '');
                     })()}
@@ -2162,7 +2341,10 @@ export default function App() {
                   
                   {isAdmin && (
                     <button 
-                      onClick={() => setScreen('admin')}
+                      onClick={() => {
+                        setScreen('admin');
+                        haptic('light');
+                      }}
                       className="absolute top-4 right-4 w-10 h-10 glass rounded-full flex items-center justify-center text-blue-400 active:scale-90 transition-all shadow-lg"
                     >
                       <Settings className="w-5 h-5" />
@@ -2172,7 +2354,10 @@ export default function App() {
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   <button 
-                    onClick={shareApp}
+                    onClick={() => {
+                      shareApp();
+                      haptic('light');
+                    }}
                     className="glass p-5 rounded-[28px] flex flex-col items-center gap-2 active:scale-95 transition-transform"
                   >
                     <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
@@ -2181,7 +2366,10 @@ export default function App() {
                     <span className="text-[10px] font-bold uppercase tracking-widest">{t('Запрасіць', 'Пригласить')}</span>
                   </button>
                   <button 
-                    onClick={() => tg?.openTelegramLink('https://t.me/scamlab_by')}
+                    onClick={() => {
+                      tg?.openTelegramLink('https://t.me/scamlab_by');
+                      haptic('light');
+                    }}
                     className="glass p-5 rounded-[28px] flex flex-col items-center gap-2 active:scale-95 transition-transform"
                   >
                     <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
@@ -2205,57 +2393,30 @@ export default function App() {
                         onClick={() => {
                           setShowLangModal(true);
                           playSfx('click');
+                          haptic('light');
                         }}
                         className="text-xs font-black text-blue-400 uppercase tracking-widest"
                       >
                         {lang === 'be' ? 'Беларуская' : 'Русский'}
                       </button>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
-                          {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-                        </div>
-                        <span className="text-sm font-bold">{t('Гук', 'Звук')}</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setSoundEnabled(!soundEnabled);
-                          playSfx('click');
-                        }}
-                        className={`w-12 h-6 rounded-full transition-all relative ${soundEnabled ? 'bg-blue-500' : 'bg-white/10'}`}
-                      >
-                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${soundEnabled ? 'right-1' : 'left-1'}`}></div>
-                      </button>
-                    </div>
+
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  <div className="glass p-5 rounded-[28px]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Trophy className="w-4 h-4 text-yellow-500" />
-                      <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('Рэйтынг', 'Рейтинг')}</span>
-                    </div>
-                    <div className="text-2xl font-black">#{userRank || '---'}</div>
-                  </div>
-                  <div className="glass p-5 rounded-[28px]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap className="w-4 h-4 text-orange-500" />
-                      <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('Вопыт', 'Опыт')}</span>
-                    </div>
-                    <div className="text-2xl font-black">{xp} XP</div>
-                  </div>
-                </div>
+                <StatsOverview variant="profile" />
 
-                <div className="glass p-6 rounded-[32px] mb-6">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-6">{t('Дасягненні', 'Достижения')}</h3>
+                <div className="glass p-6 rounded-[32px] mt-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white/30">{t('Дасягненні', 'Достижения')}</h3>
+                    <Award className="w-4 h-4 text-blue-400 opacity-50" />
+                  </div>
                   <div className="space-y-4">
                     {[
                       { id: 'first_win', icon: '🎯', title_be: 'Першаадкрывальнік', title_ru: 'Первооткрыватель', desc_be: 'Пройдзена першая сімуляцыя', desc_ru: 'Пройдена первая симуляция', unlocked: completedScenarios.length > 0 },
-                      { id: 'streak_3', icon: '🔥', title_be: 'Настойлівы', title_ru: 'Настойчивый', desc_be: 'Серыя з 3 дзён', desc_ru: 'Серия из 3 дней', unlocked: streak >= 3 },
+                      { id: 'streak_3', icon: '💀', title_be: 'Няўдачлівы', title_ru: 'Неудачливый', desc_be: 'Серыя з 3 няправільных адказаў запар', desc_ru: 'Серия из 3 неправильных ответов подряд', unlocked: streak >= 3 },
                       { id: 'xp_1000', icon: '💎', title_be: 'Эксперт', title_ru: 'Эксперт', desc_be: 'Набрана 1000 XP', desc_ru: 'Набрано 1000 XP', unlocked: xp >= 1000 },
-                      { id: 'master', icon: '🛡️', title_be: 'Майстар бяспекі', title_ru: 'Мастер безопасности', desc_be: 'Дасягнуты 10 узровень', desc_ru: 'Достигнут 10 уровень', unlocked: Math.floor(xp / 100) + 1 >= 10 }
+                      { id: 'master', icon: '🛡️', title_be: 'Майстар бяспекі', title_ru: 'Мастер безопасности', desc_be: 'Дасягнуты 10 узровень', desc_ru: 'Достигнут 10 уровень', unlocked: level >= 10 }
                     ].map(ach => (
                       <div 
                         key={ach.id} 
@@ -2271,32 +2432,6 @@ export default function App() {
                         {ach.unlocked && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                <div className="glass p-6 rounded-[32px]">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-4">{t('Статыстыка', 'Статистика')}</h3>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold">{t('Пройдзена тэстаў', 'Пройдено тестов')}</span>
-                      <span className="text-xs font-black">{completedScenarios.length}</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 transition-all duration-1000" 
-                        style={{ width: `${Math.min(100, (completedScenarios.length / Math.max(1, allScenarios.length)) * 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold">{t('Дакладнасць', 'Точность')}</span>
-                      <span className="text-xs font-black">{completedScenarios.length > 0 ? '88%' : '0%'}</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-green-500 transition-all duration-1000" 
-                        style={{ width: completedScenarios.length > 0 ? '88%' : '0%' }}
-                      ></div>
-                    </div>
                   </div>
                 </div>
               </div>
