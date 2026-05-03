@@ -75,43 +75,76 @@ const N_QUESTIONS = 10;
 const SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 export default function App() {
-  const [gruzim, setGruzim] = useState(true), [progres_bar, setProgresBar] = useState(0), [pokazat_yaz, setPokazatYaz] = useState(false);
-  const [okno_podtverzdeniya, setOknoPodtverzdeniya] = useState<{ show: boolean; title: string; onConfirm: () => void } | null>(null);
-  const [okno_vnimanie, setOknoVnimanie] = useState<{ show: boolean; title: string; message: string } | null>(null);
-  const [onbording_viden, setOnbordingViden] = useState(false), [okno_nika, setOknoNika] = useState(false), [vremennyi_nik, setVremennyiNik] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [showLangModal, setShowLangModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState<{ show: boolean; title: string; onConfirm: () => void } | null>(null);
+  const [showAlertModal, setShowAlertModal] = useState<{ show: boolean; title: string; message: string } | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
+  const [tempNickname, setTempNickname] = useState('');
   
-  const [ekran, setEkran] = useState<'loading' | 'welcome' | 'intro' | 'game' | 'final' | 'hub' | 'onboarding'>('loading'), [tabik, setTabik] = useState<'home' | 'profile'>('home');
+  const [screen, setScreen] = useState<'loading' | 'welcome' | 'intro' | 'game' | 'final' | 'hub' | 'onboarding'>('loading');
+  const [activeTab, setActiveTab] = useState<'home' | 'profile'>('home');
 
-  const [yaz, setYaz] = useState<'be' | 'ru'>(() => localStorage.getItem('scamlab_lang') as any || 'ru');
-  const [nik, setNik] = useState(() => localStorage.getItem('scamlab_nickname') || 'Ананім'), [ava, setAva] = useState(() => localStorage.getItem('scamlab_photo') || '');
-  const [vkl_zvuk, setVklZvuk] = useState(() => localStorage.getItem('scamlab_sound') !== 'false'), [vkl_muzlo, setVklMuzlo] = useState(() => localStorage.getItem('scamlab_music') !== 'false');
-  const [opyt, setOpyt] = useState(() => parseInt(localStorage.getItem('scamlab_xp') || '0')), [lvl, setLvl] = useState(() => parseInt(localStorage.getItem('scamlab_level') || '1'));
-  const [seriya, setSeriya] = useState(() => parseInt(localStorage.getItem('scamlab_streak') || '0')), [max_kombo_vsego, setMaxKomboVsego] = useState(() => parseInt(localStorage.getItem('scamlab_max_combo') || '0'));
-  const [vse_verno, setVseVerno] = useState(() => parseInt(localStorage.getItem('scamlab_total_correct') || '0')), [vsego_otvetov, setVsegoOtvetov] = useState(() => parseInt(localStorage.getItem('scamlab_total_answered') || '0'));
-  const [proydeno, setProydeno] = useState<number[]>(() => JSON.parse(localStorage.getItem('scamlab_completed') || '[]'));
+  // Persistence
+  const [lang, setLang] = useState<'be' | 'ru'>(() => {
+    const saved = localStorage.getItem('scamlab_lang');
+    if (saved) return saved as 'be' | 'ru';
+    return 'ru'; // Default to RU
+  });
+  const [nickname, setNickname] = useState(() => localStorage.getItem('scamlab_nickname') || 'Ананім');
+  const [photoURL, setPhotoURL] = useState(() => localStorage.getItem('scamlab_photo') || '');
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('scamlab_sound') !== 'false');
+  const [musicEnabled, setMusicEnabled] = useState(() => localStorage.getItem('scamlab_music') !== 'false');
+  const [xp, setXp] = useState(() => parseInt(localStorage.getItem('scamlab_xp') || '0'));
+  const [level, setLevel] = useState(() => parseInt(localStorage.getItem('scamlab_level') || '1'));
+  const [streak, setStreak] = useState(() => parseInt(localStorage.getItem('scamlab_streak') || '0'));
+  const [maxComboOverall, setMaxComboOverall] = useState(() => parseInt(localStorage.getItem('scamlab_max_combo') || '0'));
+  const [totalCorrect, setTotalCorrect] = useState(() => parseInt(localStorage.getItem('scamlab_total_correct') || '0'));
+  const [totalAnswered, setTotalAnswered] = useState(() => parseInt(localStorage.getItem('scamlab_total_answered') || '0'));
+  const [completedScenarios, setCompletedScenarios] = useState<number[]>(() => {
+    const saved = localStorage.getItem('scamlab_completed');
+    return saved ? JSON.parse(saved) : [];
+  });
   
-  const [vybran_shar, setVybranShar] = useState<string | null>(null), [sloznost, setSloznost] = useState('all');
+  const [selectedSphere, setSelectedSphere] = useState<string | null>(null);
+  const [selectedDiff, setSelectedDiff] = useState('all');
 
-  const vse_scenarii = [...scenariosData];
+  const allScenarios = [...scenariosData];
 
+  // Sync persistence
+  useEffect(() => { localStorage.setItem('scamlab_lang', lang); }, [lang]);
+  useEffect(() => { localStorage.setItem('scamlab_nickname', nickname); }, [nickname]);
+  useEffect(() => { localStorage.setItem('scamlab_photo', photoURL); }, [photoURL]);
+  useEffect(() => { localStorage.setItem('scamlab_sound', String(soundEnabled)); }, [soundEnabled]);
+  useEffect(() => { localStorage.setItem('scamlab_music', String(musicEnabled)); }, [musicEnabled]);
+  useEffect(() => { localStorage.setItem('scamlab_xp', String(xp)); }, [xp]);
+  useEffect(() => { localStorage.setItem('scamlab_level', String(level)); }, [level]);
+  useEffect(() => { localStorage.setItem('scamlab_streak', String(streak)); }, [streak]);
+  useEffect(() => { localStorage.setItem('scamlab_max_combo', String(maxComboOverall)); }, [maxComboOverall]);
+  useEffect(() => { localStorage.setItem('scamlab_total_correct', String(totalCorrect)); }, [totalCorrect]);
+  useEffect(() => { localStorage.setItem('scamlab_total_answered', String(totalAnswered)); }, [totalAnswered]);
+  useEffect(() => { localStorage.setItem('scamlab_completed', JSON.stringify(completedScenarios)); }, [completedScenarios]);
+
+  const sendNotification = (message: string) => {
+    console.log('Notification (local):', message);
+  };
+
+  const triggerSync = useCallback(() => {
+    // Done automatically via localStorage updates
+  }, []);
+
+  const generateLinkCode = async () => {
+    // Local memory only
+  };
+
+  // Screen transition sound
   useEffect(() => {
-    localStorage.setItem('scamlab_lang', yaz);
-    localStorage.setItem('scamlab_nickname', nik);
-    localStorage.setItem('scamlab_photo', ava);
-    localStorage.setItem('scamlab_sound', String(vkl_zvuk));
-    localStorage.setItem('scamlab_music', String(vkl_muzlo));
-    localStorage.setItem('scamlab_xp', String(opyt));
-    localStorage.setItem('scamlab_level', String(lvl));
-    localStorage.setItem('scamlab_streak', String(seriya));
-    localStorage.setItem('scamlab_max_combo', String(max_kombo_vsego));
-    localStorage.setItem('scamlab_total_correct', String(vse_verno));
-    localStorage.setItem('scamlab_total_answered', String(vsego_otvetov));
-    localStorage.setItem('scamlab_completed', JSON.stringify(proydeno));
-  }, [yaz, nik, ava, vkl_zvuk, vkl_muzlo, opyt, lvl, seriya, max_kombo_vsego, vse_verno, vsego_otvetov, proydeno]);
-
-  const pishim_uvedomlenie = (m: string) => console.log('Uvedomlenie:', m);
-
-  useEffect(() => { (ekran !== 'loading' && ekran !== 'game') && igraem_sfx('transition'); }, [ekran]);
+    if (screen !== 'loading' && screen !== 'game') {
+      playSfx('transition');
+    }
+  }, [screen]);
   
   useEffect(() => {
     // Analytics/Session tracking logic could go here
@@ -119,117 +152,372 @@ export default function App() {
 
   // --- Components ---
 
-  const Statistika = ({ variant = 'default' }: { variant?: 'default' | 'profile' }) => {
-    const tochnost = vsego_otvetov > 0 ? Math.round((vse_verno / vsego_otvetov) * 100) : 0;
-    const nyneshniy_rang = RANKS.filter(r => lvl >= r.min).pop();
-    return variant === 'profile' ? (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="glass p-5 rounded-[28px]"><div className="flex items-center gap-2 mb-2"><Award className="w-4 h-4 text-yellow-500" /><span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{p('Узровень', 'Уровень')}</span></div><div className="text-2xl font-black">{lvl}</div></div>
-          <div className="glass p-5 rounded-[28px]"><div className="flex items-center gap-2 mb-2"><Zap className="w-4 h-4 text-orange-500" /><span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{p('Вопыт', 'Опыт')}</span></div><div className="text-2xl font-black">{opyt} XP</div></div>
+  const StatsOverview = ({ variant = 'default' }: { variant?: 'default' | 'profile' }) => {
+    const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+    const currentRank = RANKS.filter(r => level >= r.min).pop();
+    
+    if (variant === 'profile') {
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass p-5 rounded-[28px]">
+              <div className="flex items-center gap-2 mb-2">
+                <Award className="w-4 h-4 text-yellow-500" />
+                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('Узровень', 'Уровень')}</span>
+              </div>
+              <div className="text-2xl font-black">{level}</div>
+            </div>
+            <div className="glass p-5 rounded-[28px]">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-orange-500" />
+                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('Вопыт', 'Опыт')}</span>
+              </div>
+              <div className="text-2xl font-black">{xp} XP</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-5 rounded-[28px] bg-white/5 border border-white/5">
+              <div className="text-[10px] font-bold text-white/30 uppercase mb-1">{t('Серыя', 'Серия')}</div>
+              <div className="text-xl font-black text-yellow-400">{streak} 🔥</div>
+            </div>
+            <div className="p-5 rounded-[28px] bg-white/5 border border-white/5">
+              <div className="text-[10px] font-bold text-white/30 uppercase mb-1">{t('Лепшая комба', 'Лучшее комбо')}</div>
+              <div className="text-xl font-black text-orange-500">{maxComboOverall} 🎯</div>
+            </div>
+          </div>
+          
+          <div className="space-y-5">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold">{t('Пройдзена тэстаў', 'Пройдено тестов')}</span>
+                <span className="text-xs font-black">{completedScenarios.length} / {allScenarios.length}</span>
+              </div>
+              <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, (completedScenarios.length / Math.max(1, allScenarios.length)) * 100)}%` }}
+                  className="h-full bg-blue-500" 
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold">{t('Дакладнасць', 'Точность')}</span>
+                <span className="text-xs font-black">{accuracy}%</span>
+              </div>
+              <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${accuracy}%` }}
+                  className="h-full bg-green-500" 
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-5 rounded-[28px] bg-white/5 border border-white/5"><div className="text-[10px] font-bold text-white/30 uppercase mb-1">{p('Серыя', 'Серия')}</div><div className="text-xl font-black text-yellow-400">{seriya} 🔥</div></div>
-          <div className="p-5 rounded-[28px] bg-white/5 border border-white/5"><div className="text-[10px] font-bold text-white/30 uppercase mb-1">{p('Лепшая комба', 'Лучшее комбо')}</div><div className="text-xl font-black text-orange-500">{max_kombo_vsego} 🎯</div></div>
-        </div>
-        <div className="space-y-5">
-          <div><div className="flex justify-between items-center mb-2"><span className="text-xs font-bold">{p('Пройдзена тэстаў', 'Пройдено тестов')}</span><span className="text-xs font-black">{proydeno.length} / {vse_scenarii.length}</span></div><div className="w-full h-2 bg-white/5 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, (proydeno.length / Math.max(1, vse_scenarii.length)) * 100)}%` }} className="h-full bg-blue-500" /></div></div>
-          <div><div className="flex justify-between items-center mb-2"><span className="text-xs font-bold">{p('Дакладнасць', 'Точность')}</span><span className="text-xs font-black">{tochnost}%</span></div><div className="w-full h-2 bg-white/5 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${tochnost}%` }} className="h-full bg-green-500" /></div></div>
-        </div>
-      </div>
-    ) : (
+      );
+    }
+
+    return (
       <div className="grid grid-cols-2 gap-3">
-        <div className="glass p-4 rounded-[24px] text-center"><div className="text-2xl font-black text-yellow-400">{opyt}</div><div className="text-[9px] font-bold text-white/50 uppercase">XP</div></div>
-        <div className="glass p-4 rounded-[24px] text-center border-blue-500/30 bg-blue-500/5"><div className="text-2xl font-black text-blue-500">{lvl}</div><div className="text-[9px] font-bold text-white/50 uppercase">{p('узровень', 'уровень')}</div></div>
-        <div className="glass p-4 rounded-[24px] text-center border-yellow-500/20 bg-yellow-500/5 relative overflow-hidden"><div className="absolute top-1 right-1 opacity-20"><Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" /></div><div className="text-2xl font-black text-yellow-400">{seriya}</div><div className="text-[9px] font-bold text-white/50 uppercase">{p('серыя', 'серия')}</div></div>
-        <div className="glass p-4 rounded-[24px] text-center border-green-500/20 bg-green-500/5"><div className="text-2xl font-black text-green-500">{tochnost}%</div><div className="text-[9px] font-bold text-white/50 uppercase">{p('дакладнасць', 'точность')}</div></div>
+        <div className="glass p-4 rounded-[24px] text-center">
+          <div className="text-2xl font-black text-yellow-400">{xp}</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">XP</div>
+        </div>
+        <div className="glass p-4 rounded-[24px] text-center border-blue-500/30 bg-blue-500/5">
+          <div className="text-2xl font-black text-blue-500">{level}</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">{t('узровень', 'уровень')}</div>
+        </div>
+        <div className="glass p-4 rounded-[24px] text-center border-yellow-500/20 bg-yellow-500/5 relative overflow-hidden">
+          <div className="absolute top-1 right-1 opacity-20"><Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" /></div>
+          <div className="text-2xl font-black text-yellow-400">{streak}</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">{t('серыя', 'серия')}</div>
+        </div>
+        <div className="glass p-4 rounded-[24px] text-center border-green-500/20 bg-green-500/5">
+          <div className="text-2xl font-black text-green-500">{accuracy}%</div>
+          <div className="text-[9px] font-bold text-white/50 uppercase">{t('дакладнасць', 'точность')}</div>
+        </div>
       </div>
     );
   };
-  const [ezednevka_gotova, setEzednevkaGotova] = useState(() => localStorage.getItem('lastDailyDate') === new Date().toDateString());
+  const [dailyCompleted, setDailyCompleted] = useState(() => {
+    const lastDaily = localStorage.getItem('lastDailyDate');
+    return lastDaily === new Date().toDateString();
+  });
 
-  const nachat_ezednevku = async () => {
-    if (ezednevka_gotova) return alert(p('Вы ўжо прайшлі сённяшні тэст!', 'Вы уже прошли сегодняшний тест!'));
-    igraem_sfx('click');
-    const vybrannie = [...vse_scenarii].sort(() => 0.5 - Math.random()).slice(0, 10).map(q => ({...q, options: [...q.options].sort(() => 0.5 - Math.random())}));
-    setVoprosi(vybrannie); setNomer(0); setOchki(0); setVsegoPrav(0); setVsegoOshib(0); setKomboShas(0); setMaxKomboIgra(0); setOtvecheno(false); setVybraniyVariant(null); setPokazatOtvet(false); setEkran('game');
-    localStorage.setItem('lastDailyDate', new Date().toDateString()); setEzednevkaGotova(true); vibraciya('success');
+  const startDailyChallenge = async () => {
+    if (dailyCompleted) {
+      alert(t('Вы ўжо прайшлі сённяшні тэст!', 'Вы уже прошли сегодняшний тест!'));
+      return;
+    }
+    
+    playSfx('click');
+    
+    // Pick 10 random scenarios for daily challenge
+    const shuffled = [...allScenarios].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, Math.min(10, shuffled.length)).map(q => ({
+      ...q,
+      options: [...q.options].sort(() => 0.5 - Math.random())
+    }));
+
+    setGameQuestions(selected);
+    setCurrentQIdx(0);
+    setScore(0);
+    setCorrectCount(0);
+    setWrongCount(0);
+    setCombo(0);
+    setMaxCombo(0);
+    setAnswered(false);
+    setSelectedOptionIdx(null);
+    setShowFeedback(false);
+    setScreen('game');
+    
+    localStorage.setItem('lastDailyDate', new Date().toDateString());
+    setDailyCompleted(true);
+    haptic('success');
   };
 
-  const muzlo_fon = useRef<Howl | null>(null), zvuki_sfx = useRef<{ [key: string]: Howl }>({});
+  const bgMusic = useRef<Howl | null>(null);
+  const sfx = useRef<{ [key: string]: Howl }>({});
 
+  // --- Sound Init ---
   useEffect(() => {
-    muzlo_fon.current = new Howl({ src: ['https://assets.mixkit.co/music/preview/mixkit-deep-urban-623.mp3'], loop: true, volume: 0.2, autoplay: vkl_muzlo });
-    zvuki_sfx.current = {
+    bgMusic.current = new Howl({
+      src: ['https://assets.mixkit.co/music/preview/mixkit-deep-urban-623.mp3'],
+      loop: true,
+      volume: 0.2,
+      autoplay: musicEnabled,
+    });
+
+    sfx.current = {
       click: new Howl({ src: ['https://assets.mixkit.co/sfx/preview/mixkit-modern-technology-select-3124.mp3'], volume: 0.5 }),
       success: new Howl({ src: ['https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-reward-952.mp3'], volume: 0.5 }),
       error: new Howl({ src: ['https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3'], volume: 0.5 }),
       transition: new Howl({ src: ['https://assets.mixkit.co/sfx/preview/mixkit-digital-quick-sweep-2342.mp3'], volume: 0.3 }),
     };
-    return () => { muzlo_fon.current?.stop(); };
+
+    return () => {
+      bgMusic.current?.stop();
+    };
   }, []);
-
-  useEffect(() => { vkl_muzlo ? muzlo_fon.current?.play() : muzlo_fon.current?.pause(); }, [vkl_muzlo]);
-
-  const igraem_sfx = (n: string) => vkl_zvuk && zvuki_sfx.current[n]?.play();
-
-  const [voprosi, setVoprosi] = useState<Scenario[]>([]), [nomer, setNomer] = useState(0), [ochki, setOchki] = useState(0), [vsego_prav, setVsegoPrav] = useState(0), [vsego_oshib, setVsegoOshib] = useState(0), [kombo_shas, setKomboShas] = useState(0), [max_kombo_igra, setMaxKomboIgra] = useState(0), [otvecheno, setOtvecheno] = useState(false), [vybraniy_variant, setVybraniyVariant] = useState<number | null>(null), [pokazat_otvet, setPokazatOtvet] = useState(false), [tryasuchka, setTryasuchka] = useState(false);
-
-  useEffect(() => {}, []);
-  useEffect(() => {}, [ekran]);
-
-  const nachat_igru = useCallback(() => {
-    igraem_sfx('transition');
-    let pul = Array.isArray(vse_scenarii) ? [...vse_scenarii] : [];
-    if (pul.length === 0) return (vibraciya('error'), setOknoVnimanie({ show: true, title: p('Памылка', 'Ошибка'), message: p('Памылка: Сцэнарыі не загружаны. Калі ласка, перазагрузіце старонку.', 'Ошибка: Сценарии не загружены. Пожалуйста, перезагрузите страницу.') }));
-    if (vybran_shar) pul = pul.filter(s => s.sphere === vybran_shar);
-    if (sloznost !== 'all') pul = pul.filter(s => s.difficulty === sloznost);
-    const vybrannie = pul.sort(() => 0.5 - Math.random()).slice(0, Math.min(N_QUESTIONS, pul.length)).map(q => ({...q, options: [...q.options].sort(() => 0.5 - Math.random())}));
-    setVoprosi(vybrannie); setNomer(0); setOchki(0); setVsegoPrav(0); setVsegoOshib(0); setKomboShas(0); setMaxKomboIgra(0); setOtvecheno(false); setVybraniyVariant(null); setPokazatOtvet(false); setEkran('game'); vibraciya('medium');
-  }, [vybran_shar, sloznost]);
 
   useEffect(() => {
-    const tiktak = setInterval(() => {
-      setProgresBar(p => {
-        if (p >= 100) { clearInterval(tiktak); setTimeout(() => { setGruzim(false); setEkran('welcome'); setPokazatYaz(true); }, 500); return 100; }
-        return p + 2;
+    if (musicEnabled) {
+      bgMusic.current?.play();
+    } else {
+      bgMusic.current?.pause();
+    }
+  }, [musicEnabled]);
+
+  const playSfx = (name: string) => {
+    if (soundEnabled) {
+      sfx.current[name]?.play();
+    }
+  };
+
+  // Game State
+  const [gameQuestions, setGameQuestions] = useState<Scenario[]>([]);
+  const [currentQIdx, setCurrentQIdx] = useState(0);
+  const [score, setScore] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [selectedOptionIdx, setSelectedOptionIdx] = useState<number | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+
+  // --- Vibration Init ---
+  useEffect(() => {
+    // No TG init needed
+  }, []);
+
+  // --- Back Button Handling ---
+  useEffect(() => {
+    // Standard web navigation
+  }, [screen]);
+
+  // --- Game Logic ---
+  const startGame = useCallback(() => {
+    playSfx('transition');
+    const data = allScenarios;
+    let pool = Array.isArray(data) ? [...data] : [] as Scenario[];
+    
+    if (pool.length === 0) {
+      console.error('Scenarios data is empty or invalid');
+      haptic('error');
+      setShowAlertModal({
+        show: true,
+        title: t('Памылка', 'Ошибка'),
+        message: t('Памылка: Сцэнарыі не загружаны. Калі ласка, перазагрузіце старонку.', 'Ошибка: Сценарии не загружены. Пожалуйста, перезагрузите страницу.')
+      });
+      return;
+    }
+
+    if (selectedSphere) {
+      const filtered = pool.filter(s => s.sphere === selectedSphere);
+      if (filtered.length > 0) pool = filtered;
+    }
+    
+    if (selectedDiff !== 'all') {
+      const filtered = pool.filter(s => s.difficulty === selectedDiff);
+      if (filtered.length > 0) pool = filtered;
+    }
+
+    const shuffled = pool.sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, Math.min(N_QUESTIONS, pool.length)).map(q => ({
+      ...q,
+      options: [...q.options].sort(() => 0.5 - Math.random())
+    }));
+
+    setGameQuestions(selected);
+    setCurrentQIdx(0);
+    setScore(0);
+    setCorrectCount(0);
+    setWrongCount(0);
+    setCombo(0);
+    setMaxCombo(0);
+    setAnswered(false);
+    setSelectedOptionIdx(null);
+    setShowFeedback(false);
+    setScreen('game');
+    
+    haptic('medium');
+  }, [selectedSphere, selectedDiff]);
+
+  // --- Loading Logic ---
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setIsLoading(false);
+            setScreen('welcome');
+            setShowLangModal(true);
+          }, 500);
+          return 100;
+        }
+        return prev + 2;
       });
     }, 50);
-    return () => clearInterval(tiktak);
+    return () => clearInterval(interval);
   }, []);
 
-  const vibraciya = useCallback((t: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'light') => {
+  const haptic = useCallback((type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'light') => {
+    // Generic vibration
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      t === 'light' ? navigator.vibrate(10) : t === 'medium' ? navigator.vibrate(20) : t === 'heavy' ? navigator.vibrate(40) : t === 'success' ? navigator.vibrate([10, 30, 10]) : t === 'warning' ? navigator.vibrate([15, 50, 15]) : navigator.vibrate([20, 100, 20]);
+      switch(type) {
+        case 'light': navigator.vibrate(10); break;
+        case 'medium': navigator.vibrate(20); break;
+        case 'heavy': navigator.vibrate(40); break;
+        case 'success': navigator.vibrate([10, 30, 10]); break;
+        case 'warning': navigator.vibrate([15, 50, 15]); break;
+        case 'error': navigator.vibrate([20, 100, 20]); break;
+      }
     }
   }, []);
 
-  const tyknut_otvet = useCallback((i: number) => {
-    if (otvecheno) return; setOtvecheno(true); setVybraniyVariant(i);
-    const q = voprosi[nomer], o = q.options[i], m = Math.max(...q.options.map(x => x.points)) || 1, e = o.points >= m * 0.4, p_ochki = o.points;
-    setOchki(v => v + p_ochki); const n_o = opyt + p_ochki * 2; setOpyt(n_o);
-    e ? setSeriya(0) : setSeriya(v => v + 1);
-    const n_l = Math.floor(Math.sqrt(n_o / 10)) + 1;
-    if (n_l > lvl) { setLvl(n_l); vibraciya('success'); }
-    if (e) {
-      igraem_sfx('success'); const n_k = kombo_shas + 1; setKomboShas(n_k); (n_k > max_kombo_igra) && setMaxKomboIgra(n_k); (n_k > max_kombo_vsego) && setMaxKomboVsego(n_k); setVsegoPrav(v => v + 1); setVse_verno(v => v + 1);
-      (n_k % 5 === 0) ? vibraciya('heavy') : vibraciya('success');
-    } else {
-      igraem_sfx('error'); setKomboShas(0); setVsegoOshib(v => v + 1); setTryasuchka(true); setTimeout(() => setTryasuchka(false), 500); vibraciya('error');
-    }
-    setVsegoOtvetov(v => v + 1); setPokazatOtvet(true);
-  }, [otvecheno, voprosi, nomer, opyt, lvl, kombo_shas, max_kombo_igra, max_kombo_vsego, vibraciya, igraem_sfx]);
+  const startAiGame = async () => {
+    startGame();
+  };
 
-  const sled_vopros = useCallback(() => {
-    if (nomer + 1 < voprosi.length) { setNomer(v => v + 1); setOtvecheno(false); setVybraniyVariant(null); setPokazatOtvet(false); }
-    else {
-      setEkran('final');
-      if (ochki >= 80) { igraem_sfx('success'); pishim_uvedomlenie(p(`🏆 Выдатны вынік! Вы набралі ${ochki} балаў.`, `🏆 Отличный результат! Вы набрали ${ochki} баллов.`)); vibraciya('success'); }
-      else if (ochki < 30) { igraem_sfx('error'); vibraciya('error'); }
-      const n_p = [...proydeno]; let izm = false; voprosi.forEach(q => (!n_p.includes(q.id)) && (n_p.push(q.id), izm = true));
-      izm && setProydeno(n_p);
+  const selectOption = useCallback((idx: number) => {
+    if (answered) return;
+    setAnswered(true);
+    setSelectedOptionIdx(idx);
+
+    const q = gameQuestions[currentQIdx];
+    const opt = q.options[idx];
+    const maxPts = Math.max(...q.options.map(o => o.points)) || 1;
+    // An answer is considered correct if it has at least 40% of the maximum possible points
+    const isCorrect = opt.points >= maxPts * 0.4;
+
+    const pts = opt.points;
+    
+    setScore(prev => prev + pts);
+    const newXp = xp + pts * 2;
+    setXp(newXp); 
+
+    // Update Streak: increment on incorrect, reset on correct
+    if (!isCorrect) {
+      setStreak(prev => prev + 1);
+    } else {
+      setStreak(0);
     }
-  }, [nomer, voprosi, ochki, igraem_sfx, proydeno]);
+
+    // Level calculation logic
+    const newLevel = Math.floor(Math.sqrt(newXp / 10)) + 1;
+    if (newLevel > level) {
+      setLevel(newLevel);
+      haptic('success');
+    }
+
+    if (isCorrect) {
+      playSfx('success');
+      const newCombo = combo + 1;
+      setCombo(newCombo);
+      if (newCombo > maxCombo) setMaxCombo(newCombo);
+      if (newCombo > maxComboOverall) setMaxComboOverall(newCombo);
+      setCorrectCount(prev => prev + 1);
+      setTotalCorrect(prev => prev + 1);
+      
+      if (newCombo % 5 === 0) {
+        haptic('heavy');
+      } else {
+        haptic('success');
+      }
+    } else {
+      playSfx('error');
+      setCombo(0);
+      setWrongCount(prev => prev + 1);
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      haptic('error');
+    }
+
+    setTotalAnswered(prev => prev + 1);
+    setShowFeedback(true);
+  }, [answered, gameQuestions, currentQIdx, xp, level, combo, maxCombo, maxComboOverall, haptic, playSfx]);
+
+  const nextQuestion = useCallback(() => {
+    if (currentQIdx + 1 < gameQuestions.length) {
+      setCurrentQIdx(prev => prev + 1);
+      setAnswered(false);
+      setSelectedOptionIdx(null);
+      setShowFeedback(false);
+    } else {
+      setScreen('final');
+      if (score >= 80) {
+        playSfx('success');
+        sendNotification(t(`🏆 Выдатны вынік! Вы набралі ${score} балаў.`, `🏆 Отличный результат! Вы набрали ${score} баллов.`));
+        haptic('success');
+      } else if (score < 30) {
+        playSfx('error');
+        haptic('error');
+      }
+      
+      // Mark scenarios as completed
+      const newCompleted = [...completedScenarios];
+      let changed = false;
+      gameQuestions.forEach(q => {
+        if (!newCompleted.includes(q.id)) {
+          newCompleted.push(q.id);
+          changed = true;
+        }
+      });
+      
+      if (changed) {
+        setCompletedScenarios(newCompleted);
+      } else {
+        // Even if no new scenarios, sync the score
+        triggerSync();
+      }
+    }
+  }, [currentQIdx, gameQuestions, score, playSfx, triggerSync, completedScenarios]);
 
   // --- Vibration Logic ---
   useEffect(() => {
@@ -242,121 +530,382 @@ export default function App() {
   }, []);
 
   // --- Helper Components ---
-  const Zhdun = () => (
-    <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} className="screen flex flex-col items-center justify-center p-8 bg-[#000] z-[999]">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none"><div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full"></div><div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full"></div></div>
-      <div className="relative mb-12"><div className="w-32 h-32 rounded-[40px] glass-bright flex items-center justify-center relative z-10"><Shield className="w-14 h-14 text-blue-500" /><motion.div animate={{ rotate: 360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} className="absolute inset-[-12px] rounded-[48px] border border-blue-500/20"></motion.div></div><div className="absolute inset-0 bg-blue-500/10 blur-3xl rounded-full"></div></div>
-      <div className="w-full max-w-[240px] relative z-10">
-        <div className="flex justify-between mb-3 px-1"><span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">{p('Загрузка сістэмы...', 'Загрузка системы...')}</span><span className="text-[10px] font-black text-blue-500 tabular-nums">{progres_bar}%</span></div>
-        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${progres_bar}%` }} className="h-full bg-gradient-to-r from-blue-600 to-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.5)]"></motion.div></div>
-        <p className="text-[8px] text-center mt-4 text-white/20 font-bold uppercase tracking-widest animate-pulse">{p('Ініцыялізацыя пратаколаў бяспекі', 'Инициализация протоколов безопасности')}</p>
+  const LoadingScreen = () => (
+    <motion.div 
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="screen flex flex-col items-center justify-center p-8 bg-[#000] z-[999]"
+    >
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full"></div>
       </div>
-      <div className="mt-12 text-center relative z-10"><p className="text-[10px] text-white/20 font-medium uppercase tracking-[0.3em]">ScamLab Protocol v2.6</p></div>
+
+      <div className="relative mb-12">
+        <div className="w-32 h-32 rounded-[40px] glass-bright flex items-center justify-center relative z-10">
+          <Shield className="w-14 h-14 text-blue-500" />
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+            className="absolute inset-[-12px] rounded-[48px] border border-blue-500/20"
+          ></motion.div>
+        </div>
+        <div className="absolute inset-0 bg-blue-500/10 blur-3xl rounded-full"></div>
+      </div>
+      
+      <div className="w-full max-w-[240px] relative z-10">
+        <div className="flex justify-between mb-3 px-1">
+          <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">{t('Загрузка сістэмы...', 'Загрузка системы...')}</span>
+          <span className="text-[10px] font-black text-blue-500 tabular-nums">{loadingProgress}%</span>
+        </div>
+        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${loadingProgress}%` }}
+            className="h-full bg-gradient-to-r from-blue-600 to-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+          ></motion.div>
+        </div>
+        <p className="text-[8px] text-center mt-4 text-white/20 font-bold uppercase tracking-widest animate-pulse">
+          {t('Ініцыялізацыя пратаколаў бяспекі', 'Инициализация протоколов безопасности')}
+        </p>
+      </div>
+      
+      <div className="mt-12 text-center relative z-10">
+        <p className="text-[10px] text-white/20 font-medium uppercase tracking-[0.3em]">ScamLab Protocol v2.6</p>
+      </div>
     </motion.div>
   );
 
-  const Klichka_Okno = () => (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass p-8 rounded-[40px] w-full max-w-sm">
-        <h3 className="text-xl font-black mb-6 text-center">{p('Змяніць нікнейм', 'Изменить никнейм')}</h3>
-        <input type="text" value={vremennyi_nik} onChange={(e) => setVremennyiNik(e.target.value)} placeholder={p('Увядзіце новы нікнейм', 'Введите новый никнейм')} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white mb-6 outline-none focus:border-blue-500/50 transition-all font-bold" autoFocus />
+  const NicknameModal = () => (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="glass p-8 rounded-[40px] w-full max-w-sm"
+      >
+        <h3 className="text-xl font-black mb-6 text-center">{t('Змяніць нікнейм', 'Изменить никнейм')}</h3>
+        <input 
+          type="text" 
+          value={tempNickname}
+          onChange={(e) => setTempNickname(e.target.value)}
+          placeholder={t('Увядзіце новы нікнейм', 'Введите новый никнейм')}
+          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white mb-6 outline-none focus:border-blue-500/50 transition-all font-bold"
+          autoFocus
+        />
         <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => setOknoNika(false)} className="w-full py-4 rounded-[24px] glass border-white/10 font-bold text-sm">{p('Адмена', 'Отмена')}</button>
-          <button onClick={() => { if (vremennyi_nik.trim()) { setNik(vremennyi_nik.trim()); setOknoNika(false); vibraciya('success'); } }} className="w-full py-4 rounded-[24px] bg-blue-500 text-white font-bold text-sm">{p('Захаваць', 'Сохранить')}</button>
+          <button 
+            onClick={() => setShowNicknameModal(false)}
+            className="w-full py-4 rounded-[24px] glass border-white/10 font-bold text-sm"
+          >
+            {t('Адмена', 'Отмена')}
+          </button>
+          <button 
+            onClick={() => {
+              if (tempNickname.trim()) {
+                setNickname(tempNickname.trim());
+                setShowNicknameModal(false);
+                haptic('success');
+              }
+            }}
+            className="w-full py-4 rounded-[24px] bg-blue-500 text-white font-bold text-sm"
+          >
+            {t('Захаваць', 'Сохранить')}
+          </button>
         </div>
       </motion.div>
     </motion.div>
   );
 
-  const Yazyk_Okno = () => (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
-      <motion.div initial={{ scale: 0.9, y: 20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} className="suspended-panel w-full max-w-sm flex flex-col items-center text-center">
-        <div className="w-16 h-16 rounded-2xl glass-bright flex items-center justify-center mb-6"><Languages className="w-8 h-8 text-blue-500" /></div>
+  const LanguageModal = () => (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        className="suspended-panel w-full max-w-sm flex flex-col items-center text-center"
+      >
+        <div className="w-16 h-16 rounded-2xl glass-bright flex items-center justify-center mb-6">
+          <Languages className="w-8 h-8 text-blue-500" />
+        </div>
         <h2 className="text-2xl font-black mb-2">Выберыце мову / Выберите язык</h2>
         <p className="text-white/60 text-sm mb-8">На якой мове вам зручней праходзіць навучанне? / На каком языке вам удобнее проходить обучение?</p>
+        
         <div className="grid grid-cols-1 gap-4 w-full">
-          <button onClick={() => { setPokazatYaz(false); if (ekran === 'welcome') { setOnbordingViden(true); setEkran('onboarding'); } igraem_sfx('click'); vibraciya('medium'); }} className="btn-primary w-full py-5 rounded-[24px]">🇧🇾 Беларуская</button>
-          <button onClick={() => { setYaz('ru'); setPokazatYaz(false); if (ekran === 'welcome') { setOnbordingViden(true); setEkran('onboarding'); } igraem_sfx('click'); vibraciya('medium'); }} className="btn-primary w-full py-5 rounded-[24px]">🇷🇺 Русский</button>
+          <button 
+            onClick={() => {
+              // Removed direct sync call from Lang button
+              setShowLangModal(false);
+              if (screen === 'welcome') {
+                setShowOnboarding(true);
+                setScreen('onboarding');
+              }
+              playSfx('click');
+              haptic('medium');
+            }}
+            className="btn-primary w-full py-5 rounded-[24px]"
+          >
+            🇧🇾 Беларуская
+          </button>
+          <button 
+            onClick={() => {
+              setLang('ru');
+              // Removed direct sync call from Lang button
+              setShowLangModal(false);
+              if (screen === 'welcome') {
+                setShowOnboarding(true);
+                setScreen('onboarding');
+              }
+              playSfx('click');
+              haptic('medium');
+            }}
+            className="btn-primary w-full py-5 rounded-[24px]"
+          >
+            🇷🇺 Русский
+          </button>
         </div>
       </motion.div>
     </motion.div>
   );
 
-  const p = (val: string | { be: string; ru: string } | any, ruVal?: string) => {
+  const t = (val: string | { be: string; ru: string } | any, ruVal?: string) => {
     if (!val) return '';
-    if (typeof val === 'string') return ruVal ? (yaz === 'be' ? val : ruVal) : val;
-    return val[yaz] || val.be || val.ru || '';
+    if (typeof val === 'string') {
+      if (ruVal) return lang === 'be' ? val : ruVal;
+      return val;
+    }
+    if (val[lang]) return val[lang];
+    return val.be || val.ru || '';
   };
-
-  const Bravzer_Okno = ({ c }: { c: any }) => {
-    if (!c) return null;
+  const SafariUI = ({ content }: { content: any }) => {
+    if (!content) return null;
     return (
       <div className="ui-safari rounded-2xl overflow-hidden bg-[#1c1c1e]">
-        <div className="safari-chrome p-3 border-b border-white/10"><div className="flex items-center gap-2"><div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/60">←</div><div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/60">→</div><div className="flex-1 bg-white/10 rounded-lg py-1.5 px-3 flex items-center gap-2 min-w-0"><span className="text-[10px] text-green-500">🔒</span><span className="text-xs text-white/60 truncate">{c.url}</span></div></div></div>
-        {c.warning && <div className="bg-red-500/15 border border-red-500/30 m-2 p-2 rounded-lg text-xs text-red-400">⚠️ {p(c.warning)}</div>}
-        <div className="p-4"><div className="text-base font-bold mb-2">{p(c.page_title)}</div><p className="text-sm text-white/60 leading-relaxed mb-4">{p(c.description)}</p>
-          {c.input_label && <div className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-sm text-white/30 mb-3">{p(c.input_label)}</div>}
-          {c.page_cta && <div className="w-full bg-blue-500/80 p-3 rounded-xl text-center font-semibold text-sm">{p(c.page_cta)}</div>}
+        <div className="safari-chrome p-3 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/60">←</div>
+            <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/60">→</div>
+            <div className="flex-1 bg-white/10 rounded-lg py-1.5 px-3 flex items-center gap-2 min-w-0">
+              <span className="text-[10px] text-green-500">🔒</span>
+              <span className="text-xs text-white/60 truncate">{content.url}</span>
+            </div>
+          </div>
+        </div>
+        {content.warning && (
+          <div className="bg-red-500/15 border border-red-500/30 m-2 p-2 rounded-lg text-xs text-red-400">
+            ⚠️ {t(content.warning)}
+          </div>
+        )}
+        <div className="p-4">
+          <div className="text-base font-bold mb-2">{t(content.page_title)}</div>
+          <p className="text-sm text-white/60 leading-relaxed mb-4">{t(content.description)}</p>
+          {content.input_label && (
+            <div className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-sm text-white/30 mb-3">
+              {t(content.input_label)}
+            </div>
+          )}
+          {content.page_cta && (
+            <div className="w-full bg-blue-500/80 p-3 rounded-xl text-center font-semibold text-sm">
+              {t(content.page_cta)}
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
-  const Telega_Okno = ({ c }: { c: any }) => {
-    if (!c) return null;
+  const TelegramUI = ({ content }: { content: any }) => {
+    if (!content) return null;
     return (
       <div className="ui-telegram bg-[#0d1117] rounded-2xl overflow-hidden">
-        <div className="bg-[#14141e]/95 p-3 border-b border-white/10 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center font-bold text-sm">{(p(c.bot_name || c.sender) || '??').slice(0, 2).toUpperCase()}</div><div><div className="text-sm font-semibold flex items-center gap-1">{p(c.bot_name || c.sender)}{c.bot_verified && <span className="text-blue-500 text-xs">✓</span>}</div><div className="text-[10px] text-green-500">{p('у сетцы', 'в сети')}</div></div></div>
-        <div className="p-4 flex flex-col gap-2">{c.messages?.map((m: any, i: number) => <div key={i} className="tg-bubble tg-bubble-in p-3 rounded-2xl text-sm max-w-[85%] self-start">{p(m)}<div className="text-[10px] text-white/30 text-right mt-1">21:09</div></div>)}</div>
-        {c.buttons && <div className="flex flex-wrap gap-2 p-4 pt-0">{c.buttons.map((b: any, i: number) => <div key={i} className="flex-1 min-w-[100px] p-2 rounded-lg bg-blue-500/15 text-blue-500 border border-blue-500/20 text-center text-xs font-medium">{p(b)}</div>)}</div>}
+        <div className="bg-[#14141e]/95 p-3 border-b border-white/10 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center font-bold text-sm">
+            {(t(content.bot_name || content.sender) || '??').slice(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <div className="text-sm font-semibold flex items-center gap-1">
+              {t(content.bot_name || content.sender)}
+              {content.bot_verified && <span className="text-blue-500 text-xs">✓</span>}
+            </div>
+            <div className="text-[10px] text-green-500">{t('у сетцы', 'в сети')}</div>
+          </div>
+        </div>
+        <div className="p-4 flex flex-col gap-2">
+          {content.messages?.map((msg: any, i: number) => (
+            <div key={i} className="tg-bubble tg-bubble-in p-3 rounded-2xl text-sm max-w-[85%] self-start">
+              {t(msg)}
+              <div className="text-[10px] text-white/30 text-right mt-1">21:09</div>
+            </div>
+          ))}
+        </div>
+        {content.buttons && (
+          <div className="flex flex-wrap gap-2 p-4 pt-0">
+            {content.buttons.map((b: any, i: number) => (
+              <div key={i} className="flex-1 min-w-[100px] p-2 rounded-lg bg-blue-500/15 text-blue-500 border border-blue-500/20 text-center text-xs font-medium">
+                {t(b)}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
 
-  const Zvonok_Okno = ({ c }: { c: any }) => {
-    if (!c) return null;
+  const PhoneUI = ({ content }: { content: any }) => {
+    if (!content) return null;
     return (
-      <div className="ui-phone bg-gradient-to-b from-[#1a1a2e] to-[#0d0d1a] p-7 rounded-2xl flex flex-col items-center gap-3"><div className="text-5xl mb-1">📞</div><div className="text-xl font-bold">{p(c.caller)}</div><div className="text-sm text-white/30">{c.number}</div><div className="text-xs text-white/60">{c.duration === 'incoming' ? p('📲 Уваходны выклік...', '📲 Входящий вызов...') : p('📞 Ідзе выклік...', '📞 Идет вызов...')}</div>{c.script && <div className="bg-white/5 border border-white/10 rounded-xl p-3 my-2 w-full text-xs text-white/60 italic leading-relaxed">"{p(c.script)}"</div>}<div className="flex gap-10 mt-2"><div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-2xl shadow-lg shadow-green-500/30">📞</div><div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-2xl shadow-lg shadow-red-500/30">📵</div></div></div>
+      <div className="ui-phone bg-gradient-to-b from-[#1a1a2e] to-[#0d0d1a] p-7 rounded-2xl flex flex-col items-center gap-3">
+        <div className="text-5xl mb-1">📞</div>
+        <div className="text-xl font-bold">{t(content.caller)}</div>
+        <div className="text-sm text-white/30">{content.number}</div>
+        <div className="text-xs text-white/60">{content.duration === 'incoming' ? t('📲 Уваходны выклік...', '📲 Входящий вызов...') : t('📞 Ідзе выклік...', '📞 Идет вызов...')}</div>
+        {content.script && (
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3 my-2 w-full text-xs text-white/60 italic leading-relaxed">
+            "{t(content.script)}"
+          </div>
+        )}
+        <div className="flex gap-10 mt-2">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-2xl shadow-lg shadow-green-500/30">📞</div>
+          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-2xl shadow-lg shadow-red-500/30">📵</div>
+        </div>
+      </div>
     );
   };
 
-  const Vatnik_Okno = ({ c }: { c: any }) => {
-    if (!c) return null;
-    const msgs = c.messages || (c.message ? [c.message] : []);
+  const WhatsappUI = ({ content }: { content: any }) => {
+    if (!content) return null;
+    const messages = content.messages || (content.message ? [content.message] : []);
+    
     return (
       <div className="ui-whatsapp rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col w-full bg-[#efe7de] transition-all duration-500">
-        <div className="bg-[#008069] p-3 pl-4 flex items-center gap-3 shrink-0 shadow-md z-10"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg overflow-hidden border border-white/10 shadow-inner">{c.avatar ? <img src={c.avatar} alt="" className="w-full h-full object-cover" /> : '👤'}</div><div className="flex-1 min-w-0"><div className="text-sm font-bold text-white truncate leading-tight">{p(c.sender || c.from || 'WhatsApp')}</div><div className="text-[11px] text-white/80 flex items-center gap-1.5 mt-0.5"><span className="w-1.5 h-1.5 rounded-full bg-[#46d362] animate-pulse"></span>{p('у сетцы', 'в сети')}</div></div><div className="flex items-center gap-4 text-white pr-2"><Video className="w-5 h-5 opacity-90 hover:opacity-100 cursor-pointer transition-opacity" />
+        {/* Sub-Header / Chat Header */}
+        <div className="bg-[#008069] p-3 pl-4 flex items-center gap-3 shrink-0 shadow-md z-10">
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg overflow-hidden border border-white/10 shadow-inner">
+            {content.avatar ? <img src={content.avatar} alt="" className="w-full h-full object-cover" /> : '👤'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-white truncate leading-tight">{t(content.sender || content.from || 'WhatsApp')}</div>
+            <div className="text-[11px] text-white/80 flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#46d362] animate-pulse"></span>
+              {t('у сетцы', 'в сети')}
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-white pr-2">
+            <Video className="w-5 h-5 opacity-90 hover:opacity-100 cursor-pointer transition-opacity" />
             <Phone className="w-4 h-4 opacity-90 hover:opacity-100 cursor-pointer transition-opacity" />
             <MoreVertical className="w-5 h-5 opacity-90 hover:opacity-100 cursor-pointer transition-opacity" />
           </div>
         </div>
 
+        {/* Chat Area */}
         <div className="flex-1 wa-chat-bg p-4 flex flex-col gap-2 min-h-[300px] max-h-[450px] overflow-y-auto scrollbar-hide">
-          {msgs.length > 0 ? msgs.map((m: any, i: number) => {
-            const vylet = m.from === 'me'; const tekst = p(m.text || m);
+          {messages.length > 0 ? messages.map((msg: any, i: number) => {
+            const isOut = msg.from === 'me';
+            const text = t(msg.text || msg);
             return (
-              <div key={i} className={`flex ${vylet ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`} style={{ animationDelay: `${i * 150}ms` }}>
-                <div className={`wa-bubble ${vylet ? 'wa-bubble-out' : 'wa-bubble-in'} relative max-w-[85%] px-3 py-1.5 shadow-sm`}><div className="text-[14.5px] leading-[1.4] text-[#111b21] break-words">{tekst}</div><div className="flex items-center justify-end gap-1 mt-0.5 h-3"><span className="text-[10px] text-[#667781]">14:20</span>{vylet && <CheckCircle2 className="w-3 h-3 text-[#53bdeb]" />}</div></div>
+              <div 
+                key={i} 
+                className={`flex ${isOut ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                style={{ animationDelay: `${i * 150}ms` }}
+              >
+                <div className={`wa-bubble ${isOut ? 'wa-bubble-out' : 'wa-bubble-in'} relative max-w-[85%] px-3 py-1.5 shadow-sm`}>
+                  <div className="text-[14.5px] leading-[1.4] text-[#111b21] break-words">
+                    {text}
+                  </div>
+                  <div className="flex items-center justify-end gap-1 mt-0.5 h-3">
+                    <span className="text-[10px] text-[#667781]">14:20</span>
+                    {isOut && <CheckCircle2 className="w-3 h-3 text-[#53bdeb]" />}
+                  </div>
+                </div>
               </div>
             );
-          }) : <div className="text-center text-gray-500 text-xs italic mt-10">{p('Няма паведамленняў', 'Нет сообщений')}</div>}
+          }) : (
+            <div className="text-center text-gray-500 text-xs italic mt-10">
+              {t('Няма паведамленняў', 'Нет сообщений')}
+            </div>
+          )}
         </div>
-        <div className="bg-[#f0f2f5] p-2 flex items-center gap-2 shrink-0 border-t border-[#e9edef]"><div className="flex gap-3 px-2 text-[#54656f]"><Smile className="w-6 h-6" /><Paperclip className="w-6 h-6" /></div><div className="flex-1 bg-white rounded-xl px-4 py-2.5 flex items-center justify-between text-[#8696a0] shadow-sm border border-transparent focus-within:border-[#008069] transition-colors"><span className="text-[15px]">{p('Паведамленне', 'Сообщение')}</span></div><div className="w-11 h-11 rounded-full bg-[#00a884] flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform"><Mic className="w-6 h-6" /></div></div>
+
+        {/* Fake Input Area */}
+        <div className="bg-[#f0f2f5] p-2 flex items-center gap-2 shrink-0 border-t border-[#e9edef]">
+          <div className="flex gap-3 px-2 text-[#54656f]">
+             <Smile className="w-6 h-6" />
+             <Paperclip className="w-6 h-6" />
+          </div>
+          <div className="flex-1 bg-white rounded-xl px-4 py-2.5 flex items-center justify-between text-[#8696a0] shadow-sm border border-transparent focus-within:border-[#008069] transition-colors">
+            <span className="text-[15px]">{t('Паведамленне', 'Сообщение')}</span>
+          </div>
+          <div className="w-11 h-11 rounded-full bg-[#00a884] flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform">
+            <Mic className="w-6 h-6" />
+          </div>
+        </div>
       </div>
     );
   };
 
-  const Diskord_Okno = ({ c }: { c: any }) => {
-    if (!c) return null;
+  const DiscordUI = ({ content }: { content: any }) => {
+    if (!content) return null;
     return (
-      <div className="ui-discord bg-[#36393f] rounded-2xl overflow-hidden p-4"><div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-2"><div className="w-6 h-6 bg-[#5865f2] rounded-lg flex items-center justify-center text-[10px]">#</div><span className="text-sm font-bold text-white/80">{p(c.channel || 'general')}</span></div><div className="space-y-4">{c.messages?.map((msg: any, i: number) => (<div key={i} className="flex gap-3"><div className="w-10 h-10 rounded-full bg-[#5865f2] flex items-center justify-center text-xs font-bold">{p(msg.from)?.slice(0, 1)}</div><div className="flex-1"><div className="flex items-center gap-2 mb-1"><span className="text-sm font-bold text-white">{p(msg.from)}</span>{msg.role && <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-white/60 uppercase">{p(msg.role)}</span>}<span className="text-[10px] text-white/20">{p('Сёння а 14:22', 'Сегодня в 14:22')}</span></div><p className="text-sm text-white/80 leading-relaxed">{p(msg.text)}</p></div></div>))}</div></div>
+      <div className="ui-discord bg-[#36393f] rounded-2xl overflow-hidden p-4">
+        <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
+          <div className="w-6 h-6 bg-[#5865f2] rounded-lg flex items-center justify-center text-[10px]">#</div>
+          <span className="text-sm font-bold text-white/80">{t(content.channel || 'general')}</span>
+        </div>
+        <div className="space-y-4">
+          {content.messages?.map((msg: any, i: number) => (
+            <div key={i} className="flex gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#5865f2] flex items-center justify-center text-xs font-bold">
+                {t(msg.from)?.slice(0, 1)}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-bold text-white">{t(msg.from)}</span>
+                  {msg.role && <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-white/60 uppercase">{t(msg.role)}</span>}
+                  <span className="text-[10px] text-white/20">{t('Сёння а 14:22', 'Сегодня в 14:22')}</span>
+                </div>
+                <p className="text-sm text-white/80 leading-relaxed">{t(msg.text)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   };
 
-  const Insta_Okno = ({ c }: { c: any }) => {
-    if (!c) return null;
+  const InstagramUI = ({ content }: { content: any }) => {
+    if (!content) return null;
     return (
-      <div className="ui-instagram bg-black rounded-2xl overflow-hidden border border-white/10"><div className="p-3 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 p-[2px]"><div className="w-full h-full rounded-full bg-black flex items-center justify-center text-[10px]">👤</div></div><div className="flex-1"><div className="text-xs font-bold flex items-center gap-1">{p(c.post_author)}{c.verified && <span className="text-blue-500 text-[10px]">✓</span>}</div><div className="text-[10px] text-white/60">{p(c.location)}</div></div></div><div className="aspect-square bg-white/5 flex items-center justify-center text-4xl">🖼️</div><div className="p-3"><div className="flex gap-3 mb-2"><span>❤️</span> <span>💬</span> <span>✈️</span></div><p className="text-xs leading-relaxed"><span className="font-bold mr-2">{p(c.post_author)}</span><span className="text-white/80">{p(c.caption)}</span></p><div className="text-[10px] text-blue-400 mt-2">{c.link}</div></div></div>
+      <div className="ui-instagram bg-black rounded-2xl overflow-hidden border border-white/10">
+        <div className="p-3 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 p-[2px]">
+            <div className="w-full h-full rounded-full bg-black flex items-center justify-center text-[10px]">👤</div>
+          </div>
+          <div className="flex-1">
+            <div className="text-xs font-bold flex items-center gap-1">
+              {t(content.post_author)}
+              {content.verified && <span className="text-blue-500 text-[10px]">✓</span>}
+            </div>
+            <div className="text-[10px] text-white/60">{t(content.location)}</div>
+          </div>
+        </div>
+        <div className="aspect-square bg-white/5 flex items-center justify-center text-4xl">🖼️</div>
+        <div className="p-3">
+          <div className="flex gap-3 mb-2">
+            <span>❤️</span> <span>💬</span> <span>✈️</span>
+          </div>
+          <p className="text-xs leading-relaxed">
+            <span className="font-bold mr-2">{t(content.post_author)}</span>
+            <span className="text-white/80">{t(content.caption)}</span>
+          </p>
+          <div className="text-[10px] text-blue-400 mt-2">{content.link}</div>
+        </div>
+      </div>
     );
   };
 
@@ -446,59 +995,275 @@ export default function App() {
     );
   };
 
-  const Okno_Podtverzdeniya = () => {
-    if (!okno_podtverzdeniya) return null;
+  const ConfirmModal = () => {
+    if (!showConfirmModal) return null;
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
-        <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="glass w-full max-w-sm p-8 rounded-[40px] text-center"><div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6"><AlertCircle className="w-8 h-8 text-red-500" /></div><h2 className="text-xl font-black mb-6">{okno_podtverzdeniya.title}</h2><div className="grid grid-cols-2 gap-3"><button onClick={() => { setOknoPodtverzdeniya(null); igraem_sfx('click'); }} className="w-full py-4 rounded-[24px] glass border-white/10 font-bold text-sm">{p('Адмена', 'Отмена')}</button><button onClick={() => { okno_podtverzdeniya.onConfirm(); igraem_sfx('click'); }} className="w-full py-4 rounded-[24px] bg-red-500 text-white font-bold text-sm shadow-lg shadow-red-500/20">{p('Так', 'Да')}</button></div></motion.div>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+      >
+        <motion.div 
+          initial={{ scale: 0.9, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          className="glass w-full max-w-sm p-8 rounded-[40px] text-center"
+        >
+          <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-black mb-6">{showConfirmModal.title}</h2>
+          
+            <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={() => {
+                setShowConfirmModal(null);
+                playSfx('click');
+              }}
+              className="w-full py-4 rounded-[24px] glass border-white/10 font-bold text-sm"
+            >
+              {t('Адмена', 'Отмена')}
+            </button>
+            <button 
+              onClick={() => {
+                showConfirmModal.onConfirm();
+                playSfx('click');
+              }}
+              className="w-full py-4 rounded-[24px] bg-red-500 text-white font-bold text-sm shadow-lg shadow-red-500/20"
+            >
+              {t('Так', 'Да')}
+            </button>
+          </div>
+        </motion.div>
       </motion.div>
     );
   };
 
-  const Okno_Vnimanie = () => {
-    if (!okno_vnimanie) return null;
+  const AlertModal = () => {
+    if (!showAlertModal) return null;
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass p-8 rounded-[40px] w-full max-w-sm text-center"><div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 mb-6 mx-auto"><AlertCircle size={32} /></div><h3 className="text-xl font-black mb-2">{p(okno_vnimanie.title)}</h3><p className="text-white/85 mb-8 leading-relaxed">{p(okno_vnimanie.message)}</p><button onClick={() => { setOknoVnimanie(null); igraem_sfx('click'); }} className="w-full py-4 rounded-[24px] bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20">{p('Зразумела', 'Понятно')}</button></motion.div>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+      >
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="glass p-8 rounded-[40px] w-full max-w-sm text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 mb-6 mx-auto">
+            <AlertCircle size={32} />
+          </div>
+          <h3 className="text-xl font-black mb-2">{t(showAlertModal.title)}</h3>
+          <p className="text-white/85 mb-8 leading-relaxed">{t(showAlertModal.message)}</p>
+          <button 
+            onClick={() => {
+              setShowAlertModal(null);
+              playSfx('click');
+            }}
+            className="w-full py-4 rounded-[24px] bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20"
+          >
+            {t('Зразумела', 'Понятно')}
+          </button>
+        </motion.div>
       </motion.div>
     );
   };
 
-  const Onbording_Ekran = () => {
-    const [stadiya, setStadiya] = useState(0);
-    const shagi = [{ title: { be: "Сардэчна запрашаем!", ru: "Добро пожаловать!" }, desc: { be: "SCAMLAB — гэта ваш асабісты трэнажор па кібербяспецы. Тут вы навучыцеся распазнаваць махляроў у рэальных сітуацыях.", ru: "SCAMLAB — это ваш личный тренажер по кибербезопасности. Здесь вы научитесь распознавать мошенников в реальных ситуациях." }, icon: <Shield className="w-16 h-16 text-blue-500" /> }, { title: { be: "Рэальныя кейсы", ru: "Реальные кейсы" }, desc: { be: "Мы выкарыстоўваем інтэрфейсы папулярных месенджараў і сацыяльных сетак, каб навучанне было максімальна набліжаным да жыцця.", ru: "Мы используем интерфейсы популярных мессенджеров и социальных сетей, чтобы обучение было максимально приближенным к жизни." }, icon: <Smartphone className="w-16 h-16 text-purple-500" /> }];
-    const dalee = () => { if (stadiya < shagi.length - 1) { setStadiya(stadiya + 1); igraem_sfx('click'); vibraciya('light'); } else { setEkran('intro'); setOnbordingViden(false); igraem_sfx('transition'); vibraciya('medium'); } };
+  const OnboardingScreen = () => {
+    const [step, setStep] = useState(0);
+    const steps = [
+      {
+        title: { be: "Сардэчна запрашаем!", ru: "Добро пожаловать!" },
+        desc: { be: "SCAMLAB — гэта ваш асабісты трэнажор па кібербяспецы. Тут вы навучыцеся распазнаваць махляроў у рэальных сітуацыях.", ru: "SCAMLAB — это ваш личный тренажер по кибербезопасности. Здесь вы научитесь распознавать мошенников в реальных ситуациях." },
+        icon: <Shield className="w-16 h-16 text-blue-500" />
+      },
+      {
+        title: { be: "Рэальныя кейсы", ru: "Реальные кейсы" },
+        desc: { be: "Мы выкарыстоўваем інтэрфейсы папулярных месенджараў і сацыяльных сетак, каб навучанне было максімальна набліжаным да жыцця.", ru: "Мы используем интерфейсы популярных мессенджеров и социальных сетей, чтобы обучение было максимально приближенным к жизни." },
+        icon: <Smartphone className="w-16 h-16 text-purple-500" />
+      }
+    ];
+
+    const nextStep = () => {
+      if (step < steps.length - 1) {
+        setStep(step + 1);
+        playSfx('click');
+        haptic('light');
+      } else {
+        setScreen('intro');
+        setShowOnboarding(false);
+        playSfx('transition');
+        haptic('medium');
+      }
+    };
+
     return (
-      <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="screen p-8 flex flex-col items-center justify-between"><div className="flex-1 flex flex-col items-center justify-center text-center w-full"><div className="suspended-panel w-full max-w-sm"><motion.div key={stadiya} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-8 flex justify-center">{shagi[stadiya].icon}</motion.div><motion.h2 key={`title-${stadiya}`} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-2xl font-black mb-4">{p(shagi[stadiya].title)}</motion.h2><motion.p key={`desc-${stadiya}`} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="text-white/85 leading-relaxed">{p(shagi[stadiya].desc)}</motion.p></div></div><div className="w-full space-y-6"><div className="flex justify-center gap-2">{shagi.map((_, i) => <div key={i} className={`h-1.5 rounded-full transition-all ${i === stadiya ? 'w-8 bg-blue-500' : 'w-2 bg-white/10'}`}></div>)}</div><button onClick={dalee} className="btn-primary w-full py-5 rounded-[24px] text-lg font-bold">{stadiya === shagi.length - 1 ? p('Пачаць', 'Начать') : p('Далей', 'Далее')}</button></div></motion.div>
+      <motion.div 
+        key="onboarding"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="screen p-8 flex flex-col items-center justify-between"
+      >
+        <div className="flex-1 flex flex-col items-center justify-center text-center w-full">
+          <div className="suspended-panel w-full max-w-sm">
+            <motion.div 
+              key={step}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="mb-8 flex justify-center"
+            >
+              {steps[step].icon}
+            </motion.div>
+            <motion.h2 
+              key={`title-${step}`}
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="text-2xl font-black mb-4"
+            >
+              {t(steps[step].title)}
+            </motion.h2>
+            <motion.p 
+              key={`desc-${step}`}
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-white/85 leading-relaxed"
+            >
+              {t(steps[step].desc)}
+            </motion.p>
+          </div>
+        </div>
+
+        <div className="w-full space-y-6">
+          <div className="flex justify-center gap-2">
+            {steps.map((_, i) => (
+              <div key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-8 bg-blue-500' : 'w-2 bg-white/10'}`}></div>
+            ))}
+          </div>
+          <button 
+            onClick={nextStep}
+            className="btn-primary w-full py-5 rounded-[24px] text-lg font-bold"
+          >
+            {step === steps.length - 1 ? t('Пачаць', 'Начать') : t('Далей', 'Далее')}
+          </button>
+        </div>
+      </motion.div>
     );
   };
 
-  const Risovat_Tabbar = () => {
-    if (gruzim || ekran === 'loading' || ekran === 'welcome' || ekran === 'game' || ekran === 'final' || ekran === 'onboarding') return null;
+  const renderTabBar = () => {
+    if (isLoading || screen === 'loading' || screen === 'welcome' || screen === 'game' || screen === 'final' || screen === 'onboarding') return null;
     return (
       <div className="tab-bar">
-        <button onClick={() => { setEkran('intro'); setTabik('home'); igraem_sfx('click'); vibraciya('light'); }} className={`tab-item ${tabik === 'home' ? 'active' : ''}`}><Layout className="w-5 h-5" /><span className="text-[9px] font-medium">{p('Галоўная', 'Главная')}</span></button>
-        <button onClick={() => { setEkran('hub'); setTabik('profile'); igraem_sfx('click'); vibraciya('light'); }} className={`tab-item ${tabik === 'profile' ? 'active' : ''}`}><User className="w-5 h-5" /><span className="text-[9px] font-medium">{p('Профіль', 'Профиль')}</span></button>
+        <button 
+          onClick={() => {
+            setScreen('intro');
+            setActiveTab('home');
+            playSfx('click');
+            haptic('light');
+          }}
+          className={`tab-item ${activeTab === 'home' ? 'active' : ''}`}
+        >
+          <Layout className="w-5 h-5" />
+          <span className="text-[9px] font-medium">{t('Галоўная', 'Главная')}</span>
+        </button>
+        <button 
+          onClick={() => {
+            setScreen('hub');
+            setActiveTab('profile');
+            playSfx('click');
+            haptic('light');
+          }}
+          className={`tab-item ${activeTab === 'profile' ? 'active' : ''}`}
+        >
+          <User className="w-5 h-5" />
+          <span className="text-[9px] font-medium">{t('Профіль', 'Профиль')}</span>
+        </button>
       </div>
     );
   };
 
   return (
     <div className="app h-full w-full relative bg-black">
-      <div className="ambient"><div className="orb orb-a"></div><div className="orb orb-b"></div></div>
-      {pokazat_yaz && <Yazyk_Okno />}
-      {okno_nika && <Klichka_Okno />}
-      {okno_podtverzdeniya && <Okno_Podtverzdeniya />}
-      {okno_vnimanie && <Okno_Vnimanie />}
+      <div className="ambient">
+        <div className="orb orb-a"></div>
+        <div className="orb orb-b"></div>
+      </div>
+
+      {showLangModal && <LanguageModal />}
+      {showNicknameModal && <NicknameModal />}
+      {showConfirmModal && <ConfirmModal />}
+      {showAlertModal && <AlertModal />}
+
       <AnimatePresence mode="wait">
-        {ekran === 'loading' && <Zhdun key="loading" />}
-        {ekran === 'onboarding' && <Onbording_Ekran />}
-        {ekran === 'welcome' && (
-          <motion.div key="welcome" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }} transition={SPRING} className="screen p-4 flex flex-col items-center justify-center">
+        {screen === 'loading' && <LoadingScreen key="loading" />}
+        {screen === 'onboarding' && <OnboardingScreen />}
+
+        {screen === 'welcome' && (
+          <motion.div 
+            key="welcome"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            transition={SPRING}
+            className="screen p-4 flex flex-col items-center justify-center"
+          >
             <div className="suspended-panel w-full max-w-sm flex flex-col items-center">
-              <div className="text-center mb-8"><motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2, ...SPRING }} className="relative w-28 h-28 mx-auto mb-6 flex items-center justify-center"><div className="absolute inset-[-15px] rounded-full bg-blue-500/20 blur-xl animate-pulse"></div><div className="w-full h-full glass-bright rounded-[32px] flex items-center justify-center shadow-2xl"><Shield className="w-14 h-14 text-white" /></div></motion.div><h1 className="text-5xl font-black tracking-tighter mb-2 bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">SCAMLAB</h1><p className="text-white/60 font-medium tracking-tight mb-6">{p('Трэнажор лічбавай бяспекі', 'Тренажер цифровой безопасности')}</p><div className="glass p-6 rounded-[32px] border border-white/5 text-left"><p className="text-xs text-white/85 leading-relaxed">{p('Сардэчна запрашаем у SCAMLAB! Гэта інтэрактыўная платформа, дзе вы навучыцеся абараняць сябе ад сучасных кіберпагроз. Мы сабралі рэальныя кейсы махлярства, каб вы маглі патрэніравацца ў бяспечным асяроддзі.','Добро пожаловать в SCAMLAB! Это интерактивная платформа, где вы научитесь защищать себя от современных киберугроз. Мы собрали реальные кейсы мошенничества, чтобы вы могли потренироваться в безопасной среде.')}</p></div></div>
-              <div className="w-full space-y-3 mb-8"><div className="grid grid-cols-2 gap-3"><div className="glass p-4 rounded-[24px] flex flex-col gap-2"><Layout className="w-5 h-5 text-blue-400" /><span className="text-xs font-bold leading-tight">{p('Рэальныя кейсы', 'Реальные кейсы')}</span></div><div className="glass p-4 rounded-[24px] flex flex-col gap-2"><Smartphone className="w-5 h-5 text-purple-400" /><span className="text-xs font-bold leading-tight">{p('iOS інтэрфейс', 'iOS интерфейс')}</span></div></div></div>
-              <div className="w-full"><button onClick={() => { setEkran('intro'); igraem_sfx('transition'); if (vkl_muzlo) muzlo_fon.current?.play(); vibraciya('success'); }} className="btn-primary w-full py-6 rounded-[28px] text-xl font-black flex items-center justify-center gap-3"><span>{p('Пачаць', 'Начать')}</span><ChevronRight className="w-7 h-7" /></button><p className="text-[11px] text-white/20 mt-4 text-center font-medium">{p('Беларуская рэдакцыя', 'Русская редакция')} · 2026</p></div>
+              <div className="text-center mb-8">
+                <motion.div 
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.2, ...SPRING }}
+                  className="relative w-28 h-28 mx-auto mb-6 flex items-center justify-center"
+                >
+                  <div className="absolute inset-[-15px] rounded-full bg-blue-500/20 blur-xl animate-pulse"></div>
+                  <div className="w-full h-full glass-bright rounded-[32px] flex items-center justify-center shadow-2xl">
+                    <Shield className="w-14 h-14 text-white" />
+                  </div>
+                </motion.div>
+                <h1 className="text-5xl font-black tracking-tighter mb-2 bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">SCAMLAB</h1>
+                <p className="text-white/60 font-medium tracking-tight mb-6">{t('Трэнажор лічбавай бяспекі', 'Тренажер цифровой безопасности')}</p>
+                
+                <div className="glass p-6 rounded-[32px] border border-white/5 text-left">
+                  <p className="text-xs text-white/85 leading-relaxed">
+                    {t(
+                      'Сардэчна запрашаем у SCAMLAB! Гэта інтэрактыўная платформа, дзе вы навучыцеся абараняць сябе ад сучасных кіберпагроз. Мы сабралі рэальныя кейсы махлярства, каб вы маглі патрэніравацца ў бяспечным асяроддзі.',
+                      'Добро пожаловать в SCAMLAB! Это интерактивная платформа, где вы научитесь защищать себя от современных киберугроз. Мы собрали реальные кейсы мошенничества, чтобы вы могли потренироваться в безопасной среде.'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full space-y-3 mb-8">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="glass p-4 rounded-[24px] flex flex-col gap-2">
+                    <Layout className="w-5 h-5 text-blue-400" />
+                    <span className="text-xs font-bold leading-tight">{t('Рэальныя кейсы', 'Реальные кейсы')}</span>
+                  </div>
+                  <div className="glass p-4 rounded-[24px] flex flex-col gap-2">
+                    <Smartphone className="w-5 h-5 text-purple-400" />
+                    <span className="text-xs font-bold leading-tight">{t('iOS інтэрфейс', 'iOS интерфейс')}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full">
+                <button 
+                  onClick={() => {
+                    setScreen('intro');
+                    playSfx('transition');
+                    if (musicEnabled) bgMusic.current?.play();
+                    haptic('success');
+                  }}
+                  className="btn-primary w-full py-6 rounded-[28px] text-xl font-black flex items-center justify-center gap-3"
+                >
+                  <span>{t('Пачаць', 'Начать')}</span>
+                  <ChevronRight className="w-7 h-7" />
+                </button>
+                <p className="text-[11px] text-white/20 mt-4 text-center font-medium">{t('Беларуская рэдакцыя', 'Русская редакция')} · 2026</p>
+              </div>
             </div>
           </motion.div>
         )}
