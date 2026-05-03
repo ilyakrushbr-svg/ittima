@@ -44,23 +44,6 @@ import {
 } from 'lucide-react';
 import scenariosData from './data/scenarios';
 import { Scenario, Option } from './types';
-import { 
-  auth, 
-  handleFirestoreError, 
-  OperationType,
-  db,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  collection,
-  query,
-  orderBy,
-  limit,
-  onSnapshot,
-  serverTimestamp,
-  onAuthStateChanged
-} from './firebase';
 
 // --- Types ---
 
@@ -95,7 +78,6 @@ const RANKS = [
   { min: 95, name_be: '💎 Кібершчыт', name_ru: '💎 Киберщит', color: '#FFD60A' },
 ];
 
-const TIMER_SECS = 15;
 const N_QUESTIONS = 10;
 
 const SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 };
@@ -112,7 +94,7 @@ export default function App() {
   const [screen, setScreen] = useState<'loading' | 'welcome' | 'intro' | 'game' | 'final' | 'hub' | 'leaderboard' | 'news' | 'onboarding' | 'admin'>('loading');
   const [activeTab, setActiveTab] = useState<'home' | 'news' | 'leaderboard' | 'profile'>('home');
 
-  const isAdmin = auth.currentUser?.email === 'ilya.krush.br@gmail.com';
+  const isAdmin = tg?.initDataUnsafe?.user?.id.toString() === ((import.meta as any).env.VITE_ADMIN_TELEGRAM_ID || '132739269148'); // Use env or fallback
 
   // Persistence
   const [lang, setLang] = useState<'be' | 'ru'>(() => {
@@ -143,8 +125,6 @@ export default function App() {
   const [selectedSphere, setSelectedSphere] = useState<string | null>(null);
   const [selectedDiff, setSelectedDiff] = useState('all');
 
-  // Firebase state
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
   const [dynamicScenarios, setDynamicScenarios] = useState<Scenario[]>([]);
@@ -152,36 +132,26 @@ export default function App() {
 
   const allScenarios = [...scenariosData, ...dynamicScenarios];
 
-  // Firebase Auth State Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('Firebase Auth State:', user ? 'Authenticated' : 'Unauthenticated');
-      setIsAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Real-time Leaderboard from Firestore
-  useEffect(() => {
-    if (!isAuthReady) return;
-    
-    const q = query(collection(db, 'users'), orderBy('xp', 'desc'), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setLeaderboard(players);
-      
-      // Calculate user rank if tg user exists
-      const tgUser = tg?.initDataUnsafe?.user;
-      if (tgUser?.id) {
-        const rank = players.findIndex(p => p.id === tgUser.id.toString());
-        if (rank !== -1) setUserRank(rank + 1);
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const res = await fetch('/api/results');
+      if (res.ok) {
+        const players = await res.json();
+        setLeaderboard(players);
+        
+        if (telegramId) {
+          const rank = players.findIndex((p: any) => p.id === telegramId);
+          if (rank !== -1) setUserRank(rank + 1);
+        }
       }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'users');
-    });
+    } catch (err) {
+      console.error('Failed to fetch leaderboard:', err);
+    }
+  }, [telegramId]);
 
-    return () => unsubscribe();
-  }, [isAuthReady, tg]);
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
   const [introView, setIntroView] = useState<'training' | 'news'>('training');
   const [isSyncing, setIsSyncing] = useState(false);
   const [userRank, setUserRank] = useState<number | null>(null);
@@ -207,12 +177,13 @@ export default function App() {
           totalCorrect: data.totalCorrect ?? totalCorrect
         })
       });
+      fetchLeaderboard();
     } catch (error) {
       console.error('Sync error:', error);
     } finally {
       setIsSyncing(false);
     }
-  }, [xp, level, lang, tg]);
+  }, [xp, level, lang, streak, maxComboOverall, totalAnswered, totalCorrect, tg, fetchLeaderboard]);
 
   // Sync persistence
   useEffect(() => { localStorage.setItem('scamlab_lang', lang); }, [lang]);
@@ -228,23 +199,45 @@ export default function App() {
   useEffect(() => { localStorage.setItem('scamlab_total_answered', String(totalAnswered)); }, [totalAnswered]);
   useEffect(() => { localStorage.setItem('scamlab_completed', JSON.stringify(completedScenarios)); }, [completedScenarios]);
 
+  const fetchNews = useCallback(async () => {
+    try {
+      const res = await fetch('/api/news');
+      if (res.ok) {
+        const data = await res.json();
+        setNews(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch news:', err);
+    }
+  }, []);
+
   // Persistence logic and Initial Data Load
   useEffect(() => {
     const fetchUserData = async () => {
       const tgUser = tg?.initDataUnsafe?.user;
+      
+      // Fetch news first anyway
+      fetchNews();
+
       if (!tgUser?.id) {
-        setIsAuthReady(true);
+        setScreen('welcome');
         return;
       }
 
-      // Automatically set telegramId if we are in TG
       setTelegramId(tgUser.id.toString());
 
       try {
         const res = await fetch(`/api/user/${tgUser.id}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.lang) setLang(data.lang);
+          if (data.lang) {
+            setLang(data.lang);
+            // If user exists and has lang, we can skip to welcome
+            setScreen('welcome');
+          } else {
+            setScreen('onboarding');
+          }
+          
           if (data.nickname) setNickname(data.nickname);
           if (data.xp) setXp(data.xp);
           if (data.level) setLevel(data.level);
@@ -252,8 +245,8 @@ export default function App() {
           if (data.maxCombo) setMaxComboOverall(data.maxCombo);
           if (data.totalCorrect) setTotalCorrect(data.totalCorrect);
           if (data.totalAnswered) setTotalAnswered(data.totalAnswered);
-          // Potential completed scenarios sync
         } else {
+          setScreen('onboarding');
           // New user or not found, sync initial info
           await syncUserWithBackend(tgUser.id, {
             id: tgUser.id,
@@ -266,13 +259,12 @@ export default function App() {
         }
       } catch (err) {
         console.error('Failed to fetch user data:', err);
-      } finally {
-        setIsAuthReady(true);
+        setScreen('onboarding');
       }
     };
 
     fetchUserData();
-  }, [tg, syncUserWithBackend]);
+  }, [tg, syncUserWithBackend, fetchNews]);
 
   // Sync Telegram data if it changes
   useEffect(() => {
@@ -287,14 +279,13 @@ export default function App() {
     }
   }, [tg]);
 
-  // Trigger sync on important changes
   const sendNotification = async (message: string) => {
-    if (!telegramId || !auth.currentUser) return;
+    if (!telegramId) return;
     try {
       await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: auth.currentUser.uid, message })
+        body: JSON.stringify({ userId: telegramId, message })
       });
     } catch (err) {
       console.error('Notification failed:', err);
@@ -302,8 +293,8 @@ export default function App() {
   };
 
   const triggerSync = useCallback(() => {
-    if (auth.currentUser && isAuthReady) {
-      syncUserWithBackend(auth.currentUser.uid, {
+    if (telegramId) {
+      syncUserWithBackend(telegramId, {
         nickname,
         lang,
         xp,
@@ -315,13 +306,11 @@ export default function App() {
         linkCode
       });
     }
-  }, [nickname, lang, xp, level, photoURL, completedScenarios, isAuthReady, telegramId, linkCode]);
+  }, [nickname, lang, xp, level, photoURL, completedScenarios, telegramId, linkCode, syncUserWithBackend]);
 
   const generateLinkCode = async () => {
-    if (!auth.currentUser) return;
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setLinkCode(code);
-    // await updateDoc(doc(db, 'users', auth.currentUser.uid), { linkCode: code });
   };
 
   // Screen transition sound
@@ -473,7 +462,6 @@ export default function App() {
     setSelectedOptionIdx(null);
     setShowFeedback(false);
     setScreen('game');
-    startTimer();
     
     localStorage.setItem('lastDailyDate', new Date().toDateString());
     setDailyCompleted(true);
@@ -526,13 +514,10 @@ export default function App() {
   const [wrongCount, setWrongCount] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [timer, setTimer] = useState(TIMER_SECS);
   const [answered, setAnswered] = useState(false);
   const [selectedOptionIdx, setSelectedOptionIdx] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
-
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- Telegram Init ---
   useEffect(() => {
@@ -576,31 +561,6 @@ export default function App() {
   }, [screen, tg]);
 
   // --- Game Logic ---
-  const handleAutoFail = useCallback(() => {
-    setAnswered(true);
-    setCombo(0);
-    setWrongCount(prev => prev + 1);
-    setShowFeedback(true);
-    setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 500);
-    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-  }, [tg]);
-
-  const startTimer = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setTimer(TIMER_SECS);
-    timerRef.current = setInterval(() => {
-      setTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          handleAutoFail();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [handleAutoFail]);
-
   const startGame = useCallback(() => {
     playSfx('transition');
     const data = allScenarios;
@@ -644,10 +604,9 @@ export default function App() {
     setSelectedOptionIdx(null);
     setShowFeedback(false);
     setScreen('game');
-    startTimer();
     
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-  }, [selectedSphere, selectedDiff, tg, startTimer]);
+  }, [selectedSphere, selectedDiff, tg]);
 
   // --- Loading Logic ---
   useEffect(() => {
@@ -680,13 +639,21 @@ export default function App() {
                 setSelectedOptionIdx(null);
                 setShowFeedback(false);
                 setScreen('game');
-                startTimer();
                 return 100;
               }
             }
 
-            setScreen('welcome');
-            setShowLangModal(true);
+            // Only set welcome screen if we haven't been diverted to something else (onboarding or direct game)
+            setScreen(prev => {
+              if (prev === 'loading') return 'welcome';
+              return prev;
+            });
+
+            // Only show lang modal if we don't have a language yet
+            const savedLang = localStorage.getItem('scamlab_lang');
+            if (!savedLang) {
+              setShowLangModal(true);
+            }
           }, 500);
           return 100;
         }
@@ -694,7 +661,7 @@ export default function App() {
       });
     }, 50);
     return () => clearInterval(interval);
-  }, [tg, startTimer]);
+  }, [tg]);
 
   const haptic = useCallback((type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'light') => {
     if (!tg?.HapticFeedback) {
@@ -727,7 +694,6 @@ export default function App() {
     if (answered) return;
     setAnswered(true);
     setSelectedOptionIdx(idx);
-    if (timerRef.current) clearInterval(timerRef.current);
 
     const q = gameQuestions[currentQIdx];
     const opt = q.options[idx];
@@ -735,8 +701,7 @@ export default function App() {
     // An answer is considered correct if it has at least 80% of the maximum possible points
     const isCorrect = opt.points >= maxPts * 0.8;
 
-    const timeBonus = (isCorrect && timer > 10) ? 2 : (isCorrect && timer > 5) ? 1 : 0;
-    const pts = opt.points + timeBonus;
+    const pts = opt.points;
     
     setScore(prev => prev + pts);
     const newXp = xp + pts * 2;
@@ -781,7 +746,7 @@ export default function App() {
 
     setTotalAnswered(prev => prev + 1);
     setShowFeedback(true);
-  }, [answered, gameQuestions, currentQIdx, timer, tg, xp, level, combo, maxCombo, maxComboOverall, haptic, playSfx]);
+  }, [answered, gameQuestions, currentQIdx, tg, xp, level, combo, maxCombo, maxComboOverall, haptic, playSfx]);
 
   const nextQuestion = useCallback(() => {
     if (currentQIdx + 1 < gameQuestions.length) {
@@ -789,7 +754,6 @@ export default function App() {
       setAnswered(false);
       setSelectedOptionIdx(null);
       setShowFeedback(false);
-      startTimer();
     } else {
       setScreen('final');
       if (score >= 80) {
@@ -818,7 +782,7 @@ export default function App() {
         triggerSync();
       }
     }
-  }, [currentQIdx, gameQuestions, startTimer, score, playSfx, triggerSync, completedScenarios]);
+  }, [currentQIdx, gameQuestions, score, playSfx, triggerSync, completedScenarios]);
 
   // --- Telegram WebApp Lifecycle ---
   useEffect(() => {
@@ -961,8 +925,8 @@ export default function App() {
               playSfx('click');
               haptic('medium');
               // Sync if already logged in
-              if (auth.currentUser && isAuthReady) {
-                syncUserWithBackend(auth.currentUser.uid, {
+              if (telegramId) {
+                syncUserWithBackend(telegramId, {
                   nickname,
                   lang: 'be',
                   xp,
@@ -985,8 +949,8 @@ export default function App() {
               playSfx('click');
               haptic('medium');
               // Sync if already logged in
-              if (auth.currentUser && isAuthReady) {
-                syncUserWithBackend(auth.currentUser.uid, {
+              if (telegramId) {
+                syncUserWithBackend(telegramId, {
                   nickname,
                   lang: 'ru',
                   xp,
@@ -1250,36 +1214,36 @@ export default function App() {
 
     useEffect(() => {
       if (adminTab === 'users') {
-        const q = query(collection(db, 'users'), orderBy('totalPoints', 'desc'), limit(100));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-        return () => unsubscribe();
+        fetch('/api/results')
+          .then(res => res.json())
+          .then(data => setAllUsers(data))
+          .catch(err => console.error('Failed to fetch users:', err));
       }
     }, [adminTab]);
 
     const handleAddNews = async () => {
       if (!newNews.title_ru || !newNews.content_ru) return;
       try {
-        const newsRef = doc(collection(db, 'news'));
-        await setDoc(newsRef, {
-          ...newNews,
-          createdAt: serverTimestamp()
-        });
-        
-        // Log action
-        await setDoc(doc(collection(db, 'logs')), {
-          userId: auth.currentUser?.uid,
-          action: 'create_news_web',
-          details: { title: newNews.title_ru },
-          timestamp: serverTimestamp()
+        const res = await fetch('/api/news', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-admin-id': telegramId || '' // Uses the current user's TG ID as the key
+          },
+          body: JSON.stringify(newNews)
         });
 
-        setIsAddingNews(false);
-        setNewNews({ title_be: '', title_ru: '', content_be: '', content_ru: '', imageUrl: '', telegraphUrl: '' });
-        playSfx('correct');
+        if (res.ok) {
+          setIsAddingNews(false);
+          setNewNews({ title_be: '', title_ru: '', content_be: '', content_ru: '', imageUrl: '', telegraphUrl: '' });
+          playSfx('success');
+          fetchNews(); // Refresh news list
+        } else {
+          console.error('Failed to add news: Unauthorized or Error');
+          playSfx('error');
+        }
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, 'news');
+        console.error('Failed to add news:', error);
       }
     };
 
@@ -1605,7 +1569,7 @@ export default function App() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
-                    className={`glass p-4 rounded-[24px] flex items-center justify-between border ${l.id === auth.currentUser?.uid ? 'border-blue-500/50 bg-blue-500/5' : 'border-white/5'}`}
+                    className={`glass p-4 rounded-[24px] flex items-center justify-between border ${l.id === telegramId ? 'border-blue-500/50 bg-blue-500/5' : 'border-white/5'}`}
                   >
                     <div className="flex items-center gap-4">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-gray-300 text-black' : i === 2 ? 'bg-orange-500 text-black' : 'glass text-white/40'}`}>
@@ -1621,7 +1585,7 @@ export default function App() {
                       <div>
                         <div className="font-bold text-sm flex items-center gap-2">
                           {l.nickname}
-                          {l.id === auth.currentUser?.uid && <span className="text-[8px] bg-blue-500 px-1.5 py-0.5 rounded text-white uppercase">{t('Вы', 'Вы')}</span>}
+                          {l.id === telegramId && <span className="text-[8px] bg-blue-500 px-1.5 py-0.5 rounded text-white uppercase">{t('Вы', 'Вы')}</span>}
                         </div>
                         <div className="text-[10px] text-white/50 uppercase font-bold tracking-widest">
                           {(() => {
@@ -2099,9 +2063,6 @@ export default function App() {
                 <div className="flex flex-col items-end">
                   <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('Рахунак', 'Счет')}</span>
                   <span className="text-xs font-bold leading-none text-blue-400">{score}</span>
-                </div>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm border-2 transition-colors ${timer < 5 ? 'border-red-500 text-red-500 animate-pulse' : 'border-white/10 text-white'}`}>
-                  {timer}
                 </div>
               </div>
             </div>

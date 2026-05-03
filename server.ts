@@ -22,7 +22,7 @@ bot.catch((err: any, ctx) => {
 const strings = {
   be: {
     welcome: '👋 Вітаем! Гэта шматмоўны бот Scamlab.\nАбярыце дзеянне:',
-    about: (mode: string) => `🛡️ **Scamlab** - гэта сімулятар кібербяспекі.\nДаныя захоўваюцца праз ${mode === 'firestore' ? 'Firestore (Firebase)' : 'SQLite (лакальна)'}.`,
+    about: () => `🛡️ **Scamlab** - гэта сімулятар кібербяспекі.\nДаныя захоўваюцца лакальна ў базе SQLite.`,
     help: '❓ **Дапамога:**\nВы можаце звярнуцца да падтрымкі, проста даслаўшы паведамленне.',
     ping: '🏓 Понг!',
     leaders: '🏆 **Топ гульцоў:**\n\n',
@@ -40,7 +40,7 @@ const strings = {
   },
   ru: {
     welcome: '👋 Привет! Это многоязычный бот Scamlab.\nВыберите действие:',
-    about: (mode: string) => `🛡️ **Scamlab** - это симулятор кибербезопасности.\nДанные хранятся через ${mode === 'firestore' ? 'Firestore (Firebase)' : 'SQLite (локально)'}.`,
+    about: () => `🛡️ **Scamlab** - это симулятор кибербезопасности.\nДанные хранятся локально в базе SQLite.`,
     help: '❓ **Помощь:**\nВы можете обратиться в поддержку, просто отправив сообщение.',
     ping: '🏓 Понг!',
     leaders: '🏆 **Топ игроков:**\n\n',
@@ -163,10 +163,9 @@ bot.action(/set_lang_(be|ru)/, async (ctx) => {
 bot.action('nav_about', async (ctx) => {
   const user = await dbService.getUser(ctx.from.id.toString());
   const lang = (user?.lang || 'ru') as 'be' | 'ru';
-  const mode = dbService.getMode();
   await ctx.answerCbQuery();
   try {
-    await ctx.editMessageText(strings[lang].about(mode), { parse_mode: 'Markdown', ...getBackKB(lang) });
+    await ctx.editMessageText(strings[lang].about(), { parse_mode: 'Markdown', ...getBackKB(lang) });
   } catch (e) {}
 });
 
@@ -310,6 +309,27 @@ async function startServer() {
     }
   });
 
+  app.get('/api/news', async (req, res) => {
+    try {
+      const news = await dbService.getNews(10);
+      res.json(news);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
+  });
+
+  app.post('/api/news', async (req, res) => {
+    if (!adminId || req.headers['x-admin-id'] !== adminId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    try {
+      await dbService.addNews(req.body);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
+  });
+
   app.get('/api/user/:id', async (req, res) => {
     try {
       const user = await dbService.getUser(req.params.id);
@@ -418,10 +438,8 @@ async function startServer() {
         ]);
 
         bot.command('status', async (ctx) => {
-          const mode = dbService.getMode();
           const users = await dbService.getAllUsers();
           const msg = `📊 **Scamlab System Status**\n\n` +
-                      `🔹 DB Mode: \`${mode}\`\n` +
                       `🔹 Total Users: \`${users.length}\`\n` +
                       `🔹 Time: \`${new Date().toLocaleString()}\``;
           ctx.reply(msg, { parse_mode: 'Markdown' });
